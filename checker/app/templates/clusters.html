@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Groups in {{ a.name }}{% endblock %}
+{% block toolbar %}{% set tab = "groups" %}{% include "_atoolbar.html" %}{% endblock %}
+{% block content %}
+<p class="hint">Submissions linked by distinctive shared content. A link is a suggestion to compare them, not a finding. Content most students share never links anyone.</p>
+{% for c in clusters %}
+<section class="panel">
+  <h2>{{ c.members|length }} linked submissions</h2>
+  <table class="compact">
+    <thead><tr><th>Submission</th><th>App suggests</th><th></th></tr></thead>
+    {% for sid in c.members %}{% set s = c.subs[sid] %}
+    <tr><td><a href="/s/{{ sid }}?tab=integrity">{{ s.filename }}</a></td>
+      <td>{% if s.report_json %}<span class="tier {{ s.report_json.tier }}">{{ TIER_LABEL.get(s.report_json.tier, s.report_json.tier) }}</span>{% endif %}</td>
+      <td>{% if sid == c.hub %}<small>shares the most with the others</small>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  <h3>Links</h3>
+  <table class="compact">
+    <thead><tr><th>Between</th><th>Shared items</th><th>Strength</th></tr></thead>
+    {% for e in c.edges|sort(attribute="weight", reverse=true) %}
+    <tr><td>{{ c.subs[e.a].filename }} and {{ c.subs[e.b].filename }}</td><td>{{ e["items"] }}</td><td>{{ e.weight }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% else %}
+<p class="empty">No groups. No two submissions share distinctive content.</p>
+{% endfor %}
+{% endblock %}

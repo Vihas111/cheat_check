@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Setup: {{ a.name }}{% endblock %}
+{% block toolbar %}{% set tab = "setup" %}{% include "_atoolbar.html" %}{% endblock %}
+{% block content %}
+<div class="narrow">
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+
+<form method="post" action="/a/{{ a.id }}/edit" class="panel form">
+  <h2>Details</h2>
+  <label>Assignment name <input name="name" value="{{ a.name }}" required></label>
+  <div class="row">
+    <label>Opens <small>optional</small><input type="datetime-local" name="start_at" value="{{ a.start_at.isoformat(timespec='minutes') if a.start_at else '' }}"></label>
+    <label>Deadline <small>optional</small><input type="datetime-local" name="deadline_at" value="{{ a.deadline_at.isoformat(timespec='minutes') if a.deadline_at else '' }}"></label>
+  </div>
+  <label>Rubric <small>One part per line, as <code>Name | points</code>. Leave empty to give one overall mark.</small>
+    <textarea name="rubric_text" rows="5" placeholder="Part A: parsing | 10&#10;Part B: output table | 10&#10;Part C: graph and discussion | 5" spellcheck="false">{{ rubric_text }}</textarea></label>
+  <label>Out of <small>Used when there is no rubric</small>
+    <input type="number" name="max_score" min="1" step="any" value="{{ a.max_score|pts }}" {% if a.rubric_json %}disabled{% endif %}></label>
+  <label>Notes <textarea name="notes" rows="2">{{ a.notes or "" }}</textarea></label>
+  <div><button class="btn primary">Save</button></div>
+</form>
+
+<section id="drop" class="panel drop" data-url="/a/{{ a.id }}/upload" aria-label="Add comparison files">
+  <input id="files" type="file" accept="application/pdf,.pdf" multiple hidden>
+  <div class="drop-main">
+    <h2>Comparison files</h2>
+    <p class="hint">Work the similarity check compares against but never grades or flags.
+      {{ compared.get("seed", 0) }} past cohort, {{ compared.get("reference", 0) }} known source {{ "file" if compared.get("reference", 0) == 1 else "files" }} added.</p>
+    <p><b>Drop PDFs here</b> <span class="faint">or</span> <label class="link" for="files">choose files</label></p>
+    <div id="upload-log" class="log" aria-live="polite"></div>
+  </div>
+  <fieldset class="segmented small" aria-label="These files are">
+    <label><input type="radio" name="mode" value="seed" checked><span>Past cohort</span></label>
+    <label><input type="radio" name="mode" value="reference"><span>Known source</span></label>
+  </fieldset>
+</section>
+
+<section class="panel form">
+  <h2>Brief and starter material</h2>
+  <form method="post" action="/a/{{ a.id }}/boilerplate" enctype="multipart/form-data" class="form">
+    <label>Anything matching these files is ignored by the similarity check. <small>{{ wl_count }} fingerprints ignored now.</small>
+      <input type="file" name="files" multiple accept=".pdf,.txt,.py,.java,.c,.cpp,.md" required></label>
+    <div><button class="btn">Ignore this content and re-scan</button></div>
+  </form>
+  <form method="post" action="/a/{{ a.id }}/rescan" class="inline">
+    <button class="btn" title="Run the similarity check again with the current settings">Re-scan similarity</button>
+    <span class="hint">Do this after changing thresholds in <a href="/settings">Settings</a>.</span>
+  </form>
+</section>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Compare {{ sa.filename }} with {{ sb.filename }}{% endblock %}
+{% block toolbar %}
+{% from "_nav.html" import navbar %}
+{{ navbar("Compare with " ~ sb.filename, [("Assignments", "/"), (a.name, "/a/" ~ a.id), (sa.filename, "/s/" ~ sa.id ~ "?tab=integrity")],
+          label(ia)|capitalize ~ " and " ~ label(ib)) }}
+{% endblock %}
+{% block content %}
+<p>{% if m.kind == "image_hash" %}The two images look the same{% if m.detail_json.variant != "orig" %} once one is {{ {"flip_h": "mirrored", "flip_v": "flipped", "rot90": "rotated", "rot180": "rotated", "rot270": "rotated", "invert": "colour-inverted"}.get(m.detail_json.variant, m.detail_json.variant) }}{% endif %}: their fingerprints differ by {{ m.detail_json.distance }} of 144 points{% if m.detail_json.inliers is defined %}, and {{ m.detail_json.inliers }} feature points line up{% endif %}.
+  {% elif m.kind == "image_feature" %}{{ m.detail_json.inliers }} feature points line up between the images, so one is likely a crop or resize of the other.
+  {% elif m.kind == "code_structure" %}The code has the same structure once variable names and spacing are ignored. {{ m.detail_json.containment|pct }} of it appears in the other file.
+  {% else %}{{ m.detail_json.containment|pct }} of this text appears in the other file. Shared passages are highlighted.{% endif %}</p>
+<p class="hint">Look for an innocent explanation too: given material, a shared data set, or a result every correct answer produces.</p>
+
+{% if siblings|length > 1 %}
+<nav class="steps-nav" aria-label="Other matches between these files">
+  <span class="hint">Matches between these two files:</span>
+  {% for x in siblings %}<a href="/m/{{ x.id }}" {% if x.id == m.id %}aria-current="page"{% endif %}>{{ loop.index }}</a>{% endfor %}
+</nav>
+{% endif %}
+
+<div class="pair">
+  {% for it, s, h in [(ia, sa, ha), (ib, sb, hb)] %}
+  <section class="panel">
+    <h2><a href="/s/{{ s.id }}">{{ s.filename }}</a></h2>
+    <p class="hint">{{ label(it)|capitalize }}</p>
+    {% if it.thumb_path %}<a href="{{ it.thumb_path|img }}" target="_blank"><img src="{{ it.thumb_path|img }}" alt="{{ label(it) }} of {{ s.filename }}"></a>{% endif %}
+    {% if it.norm_text %}
+    <h3>{% if it.thumb_path %}Text read from the image{% else %}Typed text{% endif %}</h3>
+    <pre>{% for chunk, hit in h %}{% if hit %}<mark>{{ chunk }}</mark>{% else %}{{ chunk }}{% endif %}{% endfor %}</pre>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+{% if both_images %}
+<details class="panel"><summary>Show matching feature points</summary>
+  <p class="hint">Lines join points found in both images. Many parallel lines mean the same picture.</p>
+  <img style="max-width: 100%;" loading="lazy" src="/m/{{ m.id }}/overlay.png" alt="Matching feature points between the two images">
+</details>
+{% endif %}
+{% endblock %}

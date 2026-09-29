@@ -1,0 +1,21 @@
+{% from "_nav.html" import navbar %}
+{% if tab == "grade" %}
+{% call navbar(a.name, [("Assignments", "/")], ((a.deadline_at.strftime("Due %d %b %Y, %H:%M") ~ ". ") if a.deadline_at else "") ~ "Click a student to open their PDF and grade it.") %}
+  <details class="menu">
+    <summary class="btn">More</summary>
+    <div class="menu-list">
+      <a href="/a/{{ a.id }}/setup">Assignment setup</a>
+      <a href="/a/{{ a.id }}/clusters">Similar groups</a>
+      <a href="/a/{{ a.id }}/calibrate">Calibrate the similarity check</a>
+      <hr>
+      <a href="/a/{{ a.id }}/grades.csv">Export grades (CSV)</a>
+      <a href="/a/{{ a.id }}/export.csv">Export integrity report (CSV)</a>
+    </div>
+  </details>
+  <a class="btn" href="/a/{{ a.id }}/setup">Setup</a>
+  <label class="btn primary" for="files">Add PDFs</label>
+{% endcall %}
+{% else %}
+{{ navbar({"groups": "Similar groups", "calibrate": "Calibrate the similarity check", "setup": "Assignment setup"}[tab],
+          [("Assignments", "/"), (a.name, "/a/" ~ a.id)]) }}
+{% endif %}

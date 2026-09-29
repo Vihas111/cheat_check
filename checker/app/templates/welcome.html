@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_nav.html" import navbar %}
+{% block title %}New assignment{% endblock %}
+{% block toolbar %}
+{% if assignments %}{{ navbar("New assignment", [("Assignments", "/")]) }}
+{% else %}{% call navbar("Grader") %}<a class="btn" href="/settings">Settings</a>{% endcall %}{% endif %}
+{% endblock %}
+{% block content %}
+<div class="narrow">
+  {% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+  {% if not assignments %}
+  <section class="intro">
+    <h2>Grade PDF submissions on this computer</h2>
+    <p>Open each submission next to a marking panel, give marks against your rubric, write feedback and release grades
+       when you are ready. A built-in similarity check points out screenshots, typed answers, tables and graphs that
+       also appear in other submissions. It only makes suggestions: you decide what, if anything, follows.</p>
+    <ol class="steps">
+      <li>Name the assignment and write its rubric.</li>
+      <li>Drop in the PDFs. Each one opens for grading right away.</li>
+      <li>Work through the list: mark, add feedback, release.</li>
+    </ol>
+  </section>
+  {% endif %}
+  <form method="post" action="/assignments" class="panel form">
+    <label>Assignment name <input name="name" required placeholder="HW2" autofocus></label>
+    <label>Rubric <small>Optional. One part per line, as <code>Name | points</code>. You can change it later.</small>
+      <textarea name="rubric_text" rows="4" spellcheck="false" placeholder="Part A: parsing | 10&#10;Part B: output table | 10&#10;Part C: graph and discussion | 5"></textarea></label>
+    <div class="row">
+      <label>Opens <small>optional</small><input type="datetime-local" name="start_at"></label>
+      <label>Deadline <small>optional</small><input type="datetime-local" name="deadline_at"></label>
+    </div>
+    <p class="hint">With dates, screenshots showing a clock or date outside this window are pointed out.</p>
+    <div><button class="btn primary">Create assignment</button></div>
+  </form>
+</div>
+{% endblock %}

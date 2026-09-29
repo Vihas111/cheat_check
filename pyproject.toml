@@ -1,0 +1,42 @@
+[project]
+name = "checker"
+version = "0.1.0"
+description = "Incremental submission similarity checker for screenshot-heavy PDFs"
+requires-python = ">=3.12"
+dependencies = [
+    "pymupdf",
+    "pillow",
+    "numpy>=2",
+    "opencv-python-headless",
+    "imagehash",
+    "rapidocr-onnxruntime",
+    "pytesseract",
+    "scikit-learn",
+    "rapidfuzz",
+    "ftfy",
+    "pygments",
+    "dateparser",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+    "sqlalchemy>=2",
+    "pydantic-settings",
+    "watchdog",
+    "networkx",
+]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "httpx"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.File", "fastapi.Form"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

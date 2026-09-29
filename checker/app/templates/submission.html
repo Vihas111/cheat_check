@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}{{ student.name if student and student.name else sub.filename }}: {{ a.name }}{% endblock %}
+{% block body_class %}grader{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block toolbar %}
+{% from "_nav.html" import navbar %}
+{% call navbar(student.name if student and student.name else sub.filename, [("Assignments", "/"), (a.name, "/a/" ~ a.id)],
+               ((student.student_id ~ ", ") if student else "") ~ ((sub.filename ~ ", ") if student and student.name else "") ~ (sub.page_count or 0) ~ " pages") %}
+    {% if pos >= 0 %}<span class="faint count">{{ pos + 1 }} of {{ count }}</span>{% endif %}
+    <div class="stepper" role="group" aria-label="Move between submissions">
+      {% if prev_id %}<a class="btn" href="/s/{{ prev_id }}" data-key="[" aria-keyshortcuts="[" title="Previous submission ( [ )">Previous</a>{% else %}<span class="btn" aria-disabled="true">Previous</span>{% endif %}
+      {% if next_sub %}<a class="btn" href="/s/{{ next_sub }}" data-key="]" aria-keyshortcuts="]" title="Next submission ( ] )">Next</a>{% else %}<span class="btn" aria-disabled="true">Next</span>{% endif %}
+    </div>
+    <a class="btn" href="/s/{{ sub.id }}/pdf" target="_blank" rel="noopener">Open PDF</a>
+{% endcall %}
+{% endblock %}
+
+{% block content %}
+{% set qp = request.query_params %}
+{% set last = reviews[0] if reviews and reviews[0].status in DECISIONS else none %}
+{% set needs_check = verify in ("awaiting", "recheck") %}
+{% set tab = "integrity" if qp.get("saved") or qp.get("tab") == "integrity" else "grade" %}
+<div class="split">
+  <section class="viewer" aria-label="Submission PDF">
+    <iframe name="pdfview" src="/s/{{ sub.id }}/pdf#view=FitH" title="{{ sub.filename }}"></iframe>
+  </section>
+
+  <aside class="inspector" aria-label="Grading">
+    {% if qp.get("err") %}<div class="notice err" role="alert">{{ qp.err }}</div>{% endif %}
+    {% if qp.get("saved_prev") %}<div class="notice" role="status">Grade released for the previous submission.</div>{% endif %}
+    {% if qp.get("saved_student") %}<div class="notice" role="status">Student saved. The similarity check is re-scanning this assignment.</div>{% endif %}
+    {% if qp.get("saved_mark") %}<div class="notice" role="status">{{ {"draft": "Draft saved. Students do not see drafts.", "released": "Grade released.", "unreleased": "Grade moved back to draft."}[qp.saved_mark] }}</div>{% endif %}
+    {% if qp.get("saved") %}<div class="notice" role="status">{% if qp.saved == "unreviewed" %}Decision withdrawn. This submission is waiting again.{% else %}Decision saved: {{ DECISIONS.get(qp.saved, "") }}.{% endif %}
+      {% if next_id %}<a href="/s/{{ next_id }}?tab=integrity">Next flagged submission</a>{% endif %}</div>{% endif %}
+
+    <div class="segmented tabs" role="tablist">
+      <button role="tab" aria-controls="tab-grade" aria-selected="{{ 'true' if tab == 'grade' else 'false' }}">Grade</button>
+      <button role="tab" aria-controls="tab-integrity" aria-selected="{{ 'true' if tab == 'integrity' else 'false' }}">Integrity{% if needs_check %} <span class="dot" aria-label="needs your decision"></span>{% endif %}</button>
+    </div>
+
+    {# ---------- grading: only the grader enters and releases marks ---------- #}
+    <section id="tab-grade" role="tabpanel" {% if tab != "grade" %}hidden{% endif %}>
+      <details class="student" {% if not student %}open{% endif %}>
+        <summary><span class="faint">Student</span>
+          <b>{% if student %}{{ student.name or student.student_id }}{% if student.name %} <span class="faint">{{ student.student_id }}</span>{% endif %}{% else %}Not set{% endif %}</b>
+          <span class="link">Change</span></summary>
+        <form method="post" action="/s/{{ sub.id }}/student" class="form">
+          <div class="row">
+            <label>Student ID <input name="student_id" value="{{ student.student_id if student else '' }}" required autocomplete="off"></label>
+            <label>Name <small>optional</small><input name="name" value="{{ student.name or '' if student else '' }}" autocomplete="off"></label>
+          </div>
+          <p class="hint">Files from the same student are never compared with each other. Saving re-scans this assignment.</p>
+          <div><button class="btn">Save student</button></div>
+        </form>
+      </details>
+      {% if sub.is_seed or sub.is_reference %}
+      <p class="hint">This file is {{ "a past cohort's work" if sub.is_seed else "a known source" }}. It is only used for the similarity check and is not graded.</p>
+      {% else %}
+      {% if needs_check %}
+      <div class="callout warn">
+        <p><b>Integrity check needed.</b> The similarity check flagged this submission. You can mark it now, but the grade can only be released after you record your decision.</p>
+        <button type="button" class="btn small" data-tab="tab-integrity">Review integrity</button>
+      </div>
+      {% elif sub.status in ("queued", "processing") %}
+      <div class="callout"><p>The similarity check is still reading this file. You can mark it now and release the grade when the check finishes.<span data-reload-when-done="/api/a/{{ a.id }}/status"></span></p></div>
+      {% endif %}
+
+      <form method="post" action="/s/{{ sub.id }}/mark" class="marking" id="marking">
+        <div class="criteria">
+        {% for c in rubric %}
+          <label class="criterion">
+            <span class="c-name">{{ c.name }}</span>
+            <span class="c-input"><input type="number" name="score_{{ loop.index0 }}" min="0" max="{{ c.points|pts }}" step="any" inputmode="decimal"
+                   value="{{ scores.get(c.name)|pts }}" data-points="{{ c.points|pts }}" {% if loop.first %}autofocus{% endif %}>
+              <small>/ {{ c.points|pts }}</small></span>
+          </label>
+        {% endfor %}
+        </div>
+        <p class="total"><span>Total</span><b><output id="total">{{ mark.total|pts if mark and mark.total is not none else "–" }}</output> <small>/ {{ a.max_score|pts }}</small></b></p>
+        <label class="field">Feedback <small>shown to the student with the grade</small>
+          <textarea name="feedback" rows="6">{{ mark.feedback or "" if mark else "" }}</textarea></label>
+        <input type="hidden" name="next" value="{{ next_ungraded or '' }}">
+        <p class="grade-state">
+          <span class="pill grade-{{ mark.status if mark else 'none' }}">{{ GRADE_LABEL[mark.status if mark else none] }}</span>
+          {% if mark %}<small>Last saved {{ mark.updated_at.strftime("%d %b %Y, %H:%M") }}</small>{% endif %}
+        </p>
+        <div class="actions">
+          <button class="btn" name="action" value="save" title="Save draft (Ctrl+S)">Save draft</button>
+          {% if mark and mark.status == "released" %}
+          <button class="btn" name="action" value="release">Update released grade</button>
+          <button class="btn plain" name="action" value="unrelease">Move back to draft</button>
+          {% else %}
+          <button class="btn primary" name="action" value="release" {% if needs_check %}disabled title="Record your integrity decision first"{% endif %}>Release grade</button>
+          {% if next_ungraded %}<button class="btn primary" name="action" value="release_next" {% if needs_check %}disabled{% endif %}>Release and next</button>{% endif %}
+          {% endif %}
+        </div>
+      </form>
+      {% endif %}
+    </section>
+
+    {# ---------- integrity: the app suggests, the grader decides ---------- #}
+    <section id="tab-integrity" role="tabpanel" {% if tab != "integrity" %}hidden{% endif %}>
+      {% if sub.status != "done" %}
+      <p class="hint">{% if sub.status == "failed" %}The similarity check could not read this file{% if job and job.error %}: {{ job.error[:300] }}{% endif %}. Try again from the submissions list.{% else %}The similarity check is still reading this file.{% endif %}</p>
+      {% else %}
+      <div class="slip {% if verify == 'decided' %}decided{% elif verify == 'not_needed' %}quiet-slip{% endif %}">
+        {% if verify == "decided" %}
+        <h2>You decided: {{ DECISIONS[last.status] }}</h2>
+        <p class="hint">{{ last.ts.strftime("%d %b %Y, %H:%M") }}{% if last.note %}. Note: {{ last.note }}{% endif %}</p>
+        {% elif verify == "recheck" %}
+        <h2>New evidence since your decision</h2>
+        <p>You decided "{{ DECISIONS[last.status]|lower }}" on {{ last.ts.strftime("%d %b %Y") }}. The suggestion is now stronger, so it needs your decision again.</p>
+        {% elif verify == "awaiting" %}
+        <h2>Awaiting your decision</h2>
+        <p>The app suggests <span class="tier {{ report.tier }}">{{ TIER_LABEL.get(report.tier, report.tier) }}</span>. This points to evidence; it is not a finding. Check the matches below, then decide.</p>
+        {% else %}
+        <h2>Nothing flagged</h2>
+        <p class="hint">No decision is needed. You can still record one.</p>
+        {% endif %}
+        <form method="post" action="/s/{{ sub.id }}/review">
+          <fieldset class="choices">
+            <legend class="hint">{% if verify == "decided" %}Change your decision{% else %}Your decision{% endif %}</legend>
+            {% for k, label in DECISIONS.items() %}
+            <label class="choice"><input type="radio" name="status" value="{{ k }}" required {% if last and last.status == k and verify == "decided" %}checked{% endif %}> {{ label }}</label>
+            {% endfor %}
+          </fieldset>
+          <label class="field">Note <small>required for "needs follow-up"; record what you checked</small>
+            <textarea name="note" rows="2"></textarea></label>
+          <div class="actions">
+            <button class="btn primary">Save decision</button>
+            {% if last %}<button class="btn plain" name="status" value="unreviewed" formnovalidate>Withdraw decision</button>{% endif %}
+          </div>
+        </form>
+        {% if reviews|length > 1 or (reviews and not last) %}
+        <details><summary>Decision history</summary>
+          <ul class="history">{% for r in reviews %}<li>{{ r.ts.strftime("%d %b %Y, %H:%M") }}: {{ DECISIONS.get(r.status, "withdrawn") }}{% if r.suggestion_json %} <small>(app suggested {{ TIER_LABEL.get(r.suggestion_json.tier, "–")|lower }})</small>{% endif %}{% if r.note %}. {{ r.note }}{% endif %}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+      </div>
+
+      <h3>Why the app suggests this</h3>
+      <ul class="reasons">{% for r in report.reasons or [] %}<li>{{ r }}</li>{% endfor %}</ul>
+      <p class="hint">{{ report.coverage|pct }} of this submission's distinctive content also appears elsewhere, compared with {{ report.population }} submissions. Content most students share, like expected output or the brief, counts little or not at all.</p>
+
+      {% if report.by_source %}
+      <h3>Where the matching content appears</h3>
+      <div class="sources" role="img" aria-label="Share of content per matching submission">
+        {% for b in report.by_source[:8] %}<a href="/s/{{ b.submission_id }}?tab=integrity" style="width: {{ (b.share * 100)|round(1) }}%" class="c{{ loop.index0 }}" title="{{ b.filename }}: {{ b.share|pct }}"></a>{% endfor %}
+      </div>
+      <table class="compact">
+        {% for b in report.by_source[:10] %}
+        <tr><td><span class="swatch c{{ loop.index0 }}"></span> <a href="/s/{{ b.submission_id }}?tab=integrity">{{ b.filename }}</a>{% if b.is_reference %} <small>known source</small>{% endif %}</td><td class="num">{{ b.share|pct }}</td><td class="num faint">{{ b["items"] }} items</td></tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if flags %}
+      <h3>Signals to check</h3>
+      {% for f in flags %}
+      <div class="signalbox">
+        <p><b>{{ FLAG_LABEL.get(f.type, f.type) }}</b> <span class="signal {{ f.severity }}">{{ f.severity }}</span></p>
+        <p>{{ f.evidence_json.summary }}</p>
+        <p class="hint">{{ FLAG_HELP.get(f.type, "") }}</p>
+        <details><summary>Show evidence</summary><pre>{{ f.evidence_json|tojson(indent=2) }}</pre></details>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <h3>Screenshots, figures and typed answers</h3>
+      <p class="hint">Highlighted items also appear in another submission. Weight is how distinctive an item is: 0 means many students have it.</p>
+      <div class="items">
+      {% for p in provenance %}
+      <article class="item {% if p.matches and p.weight %}matched{% endif %}">
+        <div class="item-head"><a href="/s/{{ sub.id }}/pdf#page={{ p.item.page }}" target="pdfview" title="Show this page in the viewer">{{ p.label|capitalize }}</a><small>weight {{ "%.2f"|format(p.weight) if p.weight is not none else "–" }}{% if p.df and p.df > 1 %}, in {{ p.df }} files{% endif %}</small></div>
+        {% if p.item.thumb_path %}<a href="{{ p.item.thumb_path|img }}" target="_blank"><img loading="lazy" src="{{ p.item.thumb_path|img }}" alt="{{ p.label }}"></a>
+        {% else %}<pre>{{ (p.item.ocr_text or "")[:600] }}</pre>{% endif %}
+        {% if p.matches %}
+        <ul class="mlist">
+          {% for m in p.matches[:5] %}
+          <li><a href="/m/{{ m.id }}">{{ others[m.other_submission_id].filename }}</a>
+            <span class="kind">{% if m.kind == "image_hash" %}same image{% if m.detail_json.variant != "orig" %}, {{ m.detail_json.variant|replace("_", " ") }}{% endif %}{% elif m.kind == "image_feature" %}same image, cropped or resized{% elif m.kind == "code_structure" %}same code structure{% else %}{{ m.score|pct }} same text{% endif %}</span></li>
+          {% endfor %}
+          {% if p.matches|length > 5 %}<li class="kind">{{ p.matches|length - 5 }} more</li>{% endif %}
+        </ul>
+        <form method="post" action="/item/{{ p.item.id }}/ignore" onsubmit="return confirm('Ignore this content in every {{ a.name }} submission, for example because it is starter code? Everything will be re-scanned.')">
+          <input type="hidden" name="back" value="/s/{{ sub.id }}?tab=integrity"><button class="btn plain small">Ignore everywhere, it is given material</button>
+        </form>
+        {% endif %}
+      </article>
+      {% endfor %}
+      </div>
+
+      {% if meta_heads %}
+      <h3>PDF metadata</h3>
+      <p class="hint">A weak signal: many programs write the same values. Matching cells are shaded.</p>
+      <div class="scroll-x">
+      <table class="compact"><thead><tr><th></th><th>This file</th>{% for h in meta_heads %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+      {% for row in meta_rows %}<tr><th>{{ row[0] }}</th>{% for v in row[1:] %}<td {% if v and v == row[1] and not loop.first %}class="same"{% endif %}>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+      </table>
+      </div>
+      {% endif %}
+      {% endif %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

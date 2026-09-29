@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block toolbar %}{% from "_nav.html" import navbar %}{{ navbar("Settings", [("Assignments", "/")]) }}{% endblock %}
+{% block content %}
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+<div class="cols">
+<section class="panel">
+  <h2>Class roster</h2>
+  <p>{{ roster }} students loaded. Use a CSV with columns <code>student_id,name,username,email</code>; only <code>student_id</code> is required.</p>
+  <p class="hint">The roster links files to students and spots screenshots that show another student's name, ID, username or email.</p>
+  <form method="post" action="/settings/roster" enctype="multipart/form-data" class="inline">
+    <input type="file" name="file" accept=".csv" required aria-label="Roster CSV"><button class="btn">Load roster</button>
+  </form>
+</section>
+<section class="panel">
+  <h2>Ignored content</h2>
+  {% if wl %}
+  <table class="compact"><thead><tr><th>What</th><th>Assignment</th><th>Why</th><th>Pieces</th><th></th></tr></thead>
+  {% for kind, scope, reason, n, _ in wl %}
+  <tr><td>{{ "images" if kind == "image" else "text" }}</td><td>{{ scope or "all" }}</td><td>{{ reason or "" }}</td><td>{{ n }}</td>
+    <td><form method="post" action="/settings/whitelist/delete"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="scope" value="{{ scope or '' }}"><input type="hidden" name="reason" value="{{ reason or '' }}"><button class="btn small">Stop ignoring</button></form></td></tr>
+  {% endfor %}
+  </table>
+  {% else %}<p class="hint">Nothing is ignored yet. Upload the brief on an assignment's setup panel, or use "Ignore everywhere" on a matched item.</p>{% endif %}
+</section>
+</div>
+
+<section class="panel">
+  <h2>Similarity check thresholds</h2>
+  <p class="hint">Reading engines found: {{ engines|join(", ") or "none. Install rapidocr-onnxruntime or tesseract" }}. All reading happens on this computer.
+    Saved values apply after you re-scan an assignment.</p>
+  <form method="post" action="/settings" class="settings">
+    {% for f in fields %}
+    <label><span><code>{{ f.name }}</code><small>{{ f.help }}</small></span>
+      {% if f.name == "ocr_engine" %}
+      <select name="ocr_engine">{% for e in ["auto", "rapidocr", "tesseract"] %}<option {% if e == f.value %}selected{% endif %}>{{ e }}</option>{% endfor %}</select>
+      {% else %}
+      <input name="{{ f.name }}" value="{{ f.value }}" {% if f.type == "int" %}type="number" step="1"{% elif f.type == "float" %}type="number" step="0.01"{% endif %}>
+      {% endif %}
+    </label>
+    {% endfor %}
+    <div class="actions"><button class="btn primary">Save settings</button></div>
+  </form>
+</section>
+
+<section class="panel danger-zone">
+  <h2>Erase all data</h2>
+  <p>Deletes every assignment, submission, grade, integrity decision, roster entry and ignored item, along with the
+     stored PDFs, images and anything in the inbox folder. The settings above are kept. This cannot be undone.</p>
+  <p class="hint">Export the grades and integrity reports you need first.</p>
+  <form method="post" action="/settings/erase" class="inline">
+    <input name="confirm" required pattern="[Ee][Rr][Aa][Ss][Ee]" autocomplete="off" spellcheck="false"
+           placeholder="Type erase to confirm" aria-label="Type erase to confirm" title="Type erase to confirm">
+    <button class="btn danger">Erase all data</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+data/
+tests/synth/out/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.env
+
+# local tool state
+.playwright-cli/
+.claude/.headroom_*
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

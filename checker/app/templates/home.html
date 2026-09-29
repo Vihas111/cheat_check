@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_nav.html" import navbar %}
+{% block title %}Assignments{% endblock %}
+{% block toolbar %}
+{% call navbar("Assignments") %}
+  <a class="btn" href="/settings">Settings</a>
+  <a class="btn primary" href="/new">New assignment</a>
+{% endcall %}
+{% endblock %}
+{% block content %}
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+<ul class="list panel flush">
+  {% for c in cards %}
+  <li>
+    <a class="list-row" href="/a/{{ c.a.id }}">
+      <span class="list-main">
+        <b>{{ c.a.name }}</b>
+        <small>{{ c.total }} {{ "submission" if c.total == 1 else "submissions" }}{% if c.a.deadline_at %}, due {{ c.a.deadline_at.strftime("%d %b %Y, %H:%M") }}{% endif %}</small>
+      </span>
+      <span class="list-side">
+        {% if c.waiting %}<span class="verify awaiting">{{ c.waiting }} to check</span>{% endif %}
+        <span class="faint">{{ c.released }} of {{ c.total }} released</span>
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

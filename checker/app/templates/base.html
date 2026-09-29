@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{% block title %}Grader{% endblock %}</title>
+<link rel="icon" href="data:,">
+<script>document.documentElement.dataset.theme = localStorage.getItem("theme") || "";</script>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+<script src="/static/app.js?v={{ asset_version }}" defer></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<div class="main">
+  {% block toolbar %}{% endblock %}
+  <main>{% block content %}{% endblock %}</main>
+  {% block footer %}
+  <footer class="foot">Grades are entered and released only by you. Integrity flags are suggestions that wait for your decision.
+    Files and results stay on this computer.</footer>
+  {% endblock %}
+</div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{% if rows %}
+<table class="subs">
+  <thead><tr><th>Student</th><th class="num">Grade</th><th>Grade status</th><th>Integrity</th><th>Similarity</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td><a class="rowlink" href="/s/{{ r.sub.id }}">{% if r.student and r.student.name %}{{ r.student.name }}{% else %}{{ r.sub.filename }}{% endif %}</a>
+      <small class="sub-file">{% if r.student and r.student.name %}{{ r.sub.filename }}{% elif r.student %}{{ r.student.student_id }}{% endif %}</small></td>
+    <td class="num">{% if r.gradable and r.mark and r.mark.total is not none %}<b>{{ r.mark.total|pts }}</b><small> / {{ a.max_score|pts }}</small>{% elif r.gradable %}<span class="faint">–</span>{% endif %}</td>
+    <td>{% if not r.gradable %}<span class="pill">{{ "Past cohort" if r.sub.is_seed else "Reference" }}</span>
+        {% else %}<span class="pill grade-{{ r.mark.status if r.mark else 'none' }}">{{ GRADE_LABEL[r.mark.status if r.mark else none] }}</span>{% endif %}</td>
+    <td>{% if r.verify == "decided" %}<span class="decision">{{ DECISIONS[r.review.status] }}</span>
+        {% elif r.verify %}<span class="verify {{ r.verify }}">{{ VERIFY_LABEL[r.verify] }}</span>
+        {% else %}<span class="faint">{{ {"queued": "Waiting to be read", "processing": "Being read", "failed": "Could not be read"}.get(r.job.state if r.job else r.sub.status, r.sub.status) }}</span>{% endif %}</td>
+    <td>{% if r.tier %}<span class="tier {{ r.tier }}">{{ TIER_LABEL[r.tier] }}</span>{% endif %}
+      {% if r.top and r.tier not in ("SEED", "REF") %}<small class="sub-file">{{ r.coverage|pct }} found elsewhere, closest {{ r.top.filename }}</small>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">{% if status == "awaiting" %}Nothing is waiting for your integrity decision.{% elif tier or status or q or grade %}No submissions match these filters.{% else %}No submissions yet. Drop PDFs here or use Add PDFs.{% endif %}</p>
+{% endif %}

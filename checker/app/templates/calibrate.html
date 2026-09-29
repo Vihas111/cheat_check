@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Calibrate {{ a.name }}{% endblock %}
+{% block toolbar %}{% set tab = "calibrate" %}{% include "_atoolbar.html" %}{% endblock %}
+{% block content %}
+<p>How {{ n }} read submissions are spread. Honest work usually bunches on the left, and copies stand apart on the right.
+  If the current setting cuts through the bunch, too many honest submissions get flagged. Change values in <a href="/settings">Settings</a>, then re-scan.</p>
+<p class="legend"><span><i></i>current setting</span><span><i class="cut"></i>suggested cut-off</span></p>
+<div class="cols">
+{% for c in charts %}
+<section class="panel">
+  <h2>{{ c.title }}</h2>
+  {% set span = c.hist|length %}
+  {% set lo = c.hist[0].lo %}{% set step = (c.hist[1].lo - c.hist[0].lo) if span > 1 else 1 %}
+  <div class="hist" role="img" aria-label="{{ c.title }} histogram">
+    {% for b in c.hist %}<div class="col" title="{{ b.n }} from {{ ((b.lo * 100)|round|int ~ '%') if c.fmt == 'pct' else b.lo|int }}"><span style="height: {{ (b.h * 100)|round }}%"></span></div>{% endfor %}
+    <i class="line" style="left: {{ ([[(c.current - lo) / (step * span), 0]|max, 1]|min * 100)|round(1) }}%"></i>
+    {% if c.cut is not none %}<i class="line cut" style="left: {{ ([[(c.cut - lo) / (step * span), 0]|max, 1]|min * 100)|round(1) }}%"></i>{% endif %}
+  </div>
+  <p class="hint"><code>{{ c.setting }}</code> is {{ c.current }}{% if c.cut is not none %}; suggested {{ c.cut }}{% endif %}.</p>
+</section>
+{% endfor %}
+</div>
+{% endblock %}

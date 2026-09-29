@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ a.name }}{% endblock %}
+{% block toolbar %}{% set tab = "grade" %}{% include "_atoolbar.html" %}{% endblock %}
+{% block content %}
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+{% set gradable = grades.values()|sum %}
+{% set released = grades.get("released", 0) %}
+{% set waiting = verify.get("awaiting", 0) + verify.get("recheck", 0) %}
+
+<section class="stats" aria-label="Progress">
+  <a class="stat" href="?grade=released">
+    <span class="stat-label">Released</span>
+    <span class="stat-value">{{ released }}<small> of {{ gradable }}</small></span>
+    <span class="bar"><span style="width: {{ (released / (gradable or 1) * 100)|round }}%"></span></span>
+  </a>
+  <a class="stat" href="?grade=draft">
+    <span class="stat-label">Drafts</span>
+    <span class="stat-value">{{ grades.get("draft", 0) }}</span>
+    <span class="stat-note">Saved, not yet released</span>
+  </a>
+  <a class="stat" href="?grade=none">
+    <span class="stat-label">Not graded</span>
+    <span class="stat-value">{{ grades.get("none", 0) }}</span>
+    <span class="stat-note">{{ rubric|length }} {{ "part" if rubric|length == 1 else "parts" }}, out of {{ a.max_score|pts }}</span>
+  </a>
+  <a class="stat {% if waiting %}attention{% endif %}" href="?status=awaiting">
+    <span class="stat-label">Integrity checks</span>
+    <span class="stat-value">{{ waiting }}</span>
+    <span class="stat-note">{% if waiting %}flagged {{ "submission awaits" if waiting == 1 else "submissions await" }} your decision{% else %}nothing waiting{% endif %}</span>
+  </a>
+</section>
+
+<section id="drop" class="drop{% if counts.values()|sum %} compact{% endif %}" data-url="/a/{{ a.id }}/upload" data-mode="submission" aria-label="Add submissions">
+  <input id="files" type="file" accept="application/pdf,.pdf" multiple hidden>
+  <div class="drop-main">
+    <p><b>Drop student PDFs anywhere on this page</b> <span class="faint">or</span> <label class="link" for="files">choose files</label></p>
+    {% if not counts.values()|sum %}<p class="hint">Name files <code>studentid_anything.pdf</code> to tie them to a student. You can change the student on each submission later.</p>{% endif %}
+    <div id="upload-log" class="log" aria-live="polite"></div>
+  </div>
+  <div id="progress" class="reading" data-status="/api/a/{{ a.id }}/status" data-table="/a/{{ a.id }}?partial=1&tier={{ tier }}&status={{ status }}&grade={{ grade }}&q={{ q|urlencode }}">
+    <span class="bar"><span id="pbar" style="width: {{ ((counts.done + counts.failed) / ((counts.values()|sum) or 1) * 100)|round }}%"></span></span>
+    <p id="ptext" class="hint" aria-live="polite">{{ counts.done }} read, {{ counts.processing }} in progress, {{ counts.queued }} waiting{% if counts.failed %}, <b>{{ counts.failed }} could not be read</b>{% endif %}{% if rescanning %}. Re-scanning.{% endif %}</p>
+  </div>
+</section>
+{% if failed %}
+<details class="panel">
+  <summary>{{ failed|length }} {{ "file" if failed|length == 1 else "files" }} could not be read</summary>
+  <ul>{% for fn, err in failed %}<li><b>{{ fn }}</b>: {{ (err or "unknown error")[:300] }}</li>{% endfor %}</ul>
+  <form method="post" action="/a/{{ a.id }}/retry"><button class="btn">Try again</button></form>
+</details>
+{% endif %}
+
+{% if not a.rubric_json %}<p class="hint">Marks are one overall score out of {{ a.max_score|pts }}. <a href="/a/{{ a.id }}/setup">Add a rubric</a> to mark part by part.</p>{% endif %}
+
+<section class="panel flush">
+  <form class="filters" method="get" role="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search students or files" aria-label="Search students or files">
+    <select name="grade" aria-label="Grade status" onchange="this.form.submit()">
+      <option value="">All grades</option>
+      <option value="none" {% if grade == "none" %}selected{% endif %}>Not graded</option>
+      <option value="draft" {% if grade == "draft" %}selected{% endif %}>Draft</option>
+      <option value="released" {% if grade == "released" %}selected{% endif %}>Released</option>
+    </select>
+    <select name="status" aria-label="Integrity" onchange="this.form.submit()">
+      <option value="">Any integrity state</option>
+      <option value="awaiting" {% if status == "awaiting" %}selected{% endif %}>Awaiting your decision</option>
+      <option value="decided" {% if status == "decided" %}selected{% endif %}>Decided</option>
+      {% for k, v in DECISIONS.items() %}<option value="{{ k }}" {% if status == k %}selected{% endif %}>Decided: {{ v|lower }}</option>{% endfor %}
+    </select>
+    <select name="tier" aria-label="Similarity" onchange="this.form.submit()">
+      <option value="">Any similarity</option>
+      {% for t, label in TIER_LABEL.items() %}<option value="{{ t }}" {% if t == tier %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% if tier or status or q or grade %}<a class="btn plain" href="/a/{{ a.id }}">Clear</a>{% endif %}
+  </form>
+  <div id="table">{% include "_table.html" %}</div>
+</section>
+{% endblock %}
