@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Grader",
+    "slug": "grader",
+    "version": "1.0.0",
+    "platforms": ["web"],
+    "web": { "bundler": "metro", "output": "single", "name": "Grader", "backgroundColor": "#F4F2EC" }
+  }
+}

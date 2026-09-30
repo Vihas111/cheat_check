@@ -37,6 +37,21 @@ Useful extras:
 Content that most submissions share (such as the expected program output) gets little or no weight.
 This keeps similar-but-honest work LOW.
 
+## Front end
+
+The web UI is a React Native app (Expo, running on react-native-web) in `checker/frontend/`. FastAPI serves its
+build and a JSON API under `/api` (`checker/app/api.py`), which reuses the same grading and verification code
+as the older server-rendered pages. Those pages are still there: they show when the build is missing, or with `?legacy=1`.
+
+```bash
+cd checker/frontend
+npm install
+npm run build        # writes checker/app/static/spa, which the server picks up on the next start
+npm run dev          # development: starts the Python server and Expo with hot reload, open http://localhost:8081
+```
+
+Themes follow the PESUcoin design system (`src/theme`): light, dark, or system, from the icon in the top bar.
+
 ## Command line
 
 ```bash

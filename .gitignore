@@ -19,3 +19,8 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+# React front end: dependencies and the build served by FastAPI (rebuild with `npm run build` in checker/frontend)
+checker/frontend/node_modules/
+checker/frontend/.expo/
+checker/app/static/spa/

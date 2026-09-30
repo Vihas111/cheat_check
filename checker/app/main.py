@@ -2,6 +2,7 @@
 
 import csv
 import io
+import re
 import shutil
 import tempfile
 from collections import Counter, defaultdict
@@ -54,6 +55,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Submission similarity checker", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+
+# The React front end (checker/frontend, built with `npm run build` into static/spa) takes over the page URLs when
+# it has been built; ?legacy=1 still shows the server-rendered pages, which also remain when it has not.
+SPA = HERE / "static" / "spa"
+PAGE_URL = re.compile(r"^/(?:new|settings|a/\d+(?:/(?:setup|clusters|calibrate))?|s/\d+|m/\d+)?$")
+if (SPA / "_expo").is_dir():
+    app.mount("/_expo", StaticFiles(directory=SPA / "_expo"), name="spa-assets")
+
+
+@app.middleware("http")
+async def serve_spa(request: Request, call_next):
+    legacy = request.query_params.get("legacy")
+    if request.method == "GET" and PAGE_URL.match(request.url.path) and not legacy and (SPA / "index.html").is_file():
+        return FileResponse(SPA / "index.html", headers={"Cache-Control": "no-cache"})
+    return await call_next(request)
+
 templates = Jinja2Templates(directory=HERE / "templates")
 # plain names for the signal chips; FLAG_HELP holds the full explanation
 FLAG_LABEL = {
@@ -129,15 +146,20 @@ def latest_reviews(db, sub_ids) -> dict[int, Review]:
 
 # ---------------- assignments / dashboard ----------------
 
+def assignment_cards(db) -> list[dict]:
+    cards = []
+    for a in db.scalars(select(Assignment).order_by(Assignment.id.desc())):
+        rows = [r for r in dashboard_rows(db, a.id) if r["gradable"]]
+        cards.append({"a": a, "total": len(rows),
+                      "released": sum(1 for r in rows if r["mark"] and r["mark"].status == "released"),
+                      "waiting": sum(1 for r in rows if r["verify"] in ("awaiting", "recheck"))})
+    return cards
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, msg: str = ""):
     with session_scope() as db:
-        cards = []
-        for a in db.scalars(select(Assignment).order_by(Assignment.id.desc())):
-            rows = [r for r in dashboard_rows(db, a.id) if r["gradable"]]
-            cards.append({"a": a, "total": len(rows),
-                          "released": sum(1 for r in rows if r["mark"] and r["mark"].status == "released"),
-                          "waiting": sum(1 for r in rows if r["verify"] in ("awaiting", "recheck"))})
+        cards = assignment_cards(db)
         if not cards:
             return render(request, "welcome.html", msg=msg)
         return render(request, "home.html", cards=cards, msg=msg)
@@ -155,6 +177,13 @@ def _dt(v: str | None):
 @app.post("/assignments")
 def create_assignment(name: str = Form(...), start_at: str = Form(""), deadline_at: str = Form(""),
                       rubric_text: str = Form("")):
+    aid, crit = make_assignment(name, start_at, deadline_at, rubric_text)
+    bad = "?msg=Assignment+created.+Could+not+read+the+rubric;+fix+it+in+Assignment+setup." if crit is False else ""
+    return RedirectResponse(f"/a/{aid}{bad}", 303)
+
+
+def make_assignment(name: str, start_at: str, deadline_at: str, rubric_text: str) -> tuple[int, list[dict] | None | bool]:
+    """Returns (id, rubric); rubric is False when its text could not be read (the assignment is still created)."""
     name = name.strip()
     if not name:
         raise HTTPException(400, "Name required")
@@ -168,28 +197,33 @@ def create_assignment(name: str = Form(...), start_at: str = Form(""), deadline_
         if crit:
             a.rubric_json, a.max_score = crit, sum(c["points"] for c in crit)
         aid = a.id
-    bad = "?msg=Assignment+created.+Could+not+read+the+rubric;+fix+it+in+Assignment+setup." if crit is False else ""
-    return RedirectResponse(f"/a/{aid}{bad}", 303)
+    return aid, crit
 
 
 @app.post("/a/{aid}/edit")
 def edit_assignment(aid: int, start_at: str = Form(""), deadline_at: str = Form(""), notes: str = Form(""),
                     rubric_text: str = Form(""), max_score: float = Form(100), name: str = Form("")):
-    back = f"/a/{aid}/setup?msg="
+    err = update_assignment(aid, name, start_at, deadline_at, notes, rubric_text, max_score)
+    return RedirectResponse(f"/a/{aid}/setup?msg=" + (err or "Saved.").replace(" ", "+"), 303)
+
+
+def update_assignment(aid: int, name: str, start_at: str, deadline_at: str, notes: str, rubric_text: str,
+                      max_score: float) -> str | None:
+    """Saves the setup form. Returns an error message, or None when saved."""
     try:
         crit = parse_rubric(rubric_text)
     except ValueError:
-        return RedirectResponse(back + "Could+not+read+the+rubric.+Write+one+part+per+line,+like+Part+A+|+10", 303)
+        return "Could not read the rubric. Write one part per line, like Part A | 10"
     name = name.strip()
     with session_scope() as db:
         a = db.get(Assignment, aid)
         if name and name != a.name:
             if db.scalar(select(Assignment).where(Assignment.name == name)):
-                return RedirectResponse(back + "Another+assignment+already+has+that+name.", 303)
+                return "Another assignment already has that name."
             rename_assignment(db, a, name)
         a.start_at, a.deadline_at, a.notes = _dt(start_at), _dt(deadline_at), notes or None
         a.rubric_json, a.max_score = crit, sum(c["points"] for c in crit) if crit else max(max_score, 1)
-    return RedirectResponse(back + "Saved.", 303)
+    return None
 
 
 def rename_assignment(db, a: Assignment, name: str):
@@ -471,32 +505,48 @@ def submission_pdf(sid: int):
 
 @app.post("/s/{sid}/mark")
 async def mark_route(request: Request, sid: int):
-    """Save the grader's marks. Releasing needs every part marked and, for a flagged submission, the
-    grader's integrity decision first: a suggestion never slips through unchecked."""
     form = await request.form()
     action = str(form.get("action", "save"))
     with session_scope() as db:
         sub = db.get(Submission, sid)
         if not sub:
             raise HTTPException(404)
+        raw = {c["name"]: str(form.get(f"score_{i}", "")) for i, c in enumerate(rubric(sub.assignment))}
+    err, state = apply_mark(sid, raw, str(form.get("feedback", "")), action)
+    if err:
+        return RedirectResponse(f"/s/{sid}?err={err.replace(' ', '+')}", 303)
+    nxt = str(form.get("next", ""))
+    if action == "release_next" and nxt.isdigit():
+        return RedirectResponse(f"/s/{nxt}?saved_prev={sid}", 303)
+    return RedirectResponse(f"/s/{sid}?saved_mark={'unreleased' if action == 'unrelease' else state}", 303)
+
+
+def apply_mark(sid: int, raw: dict[str, str], feedback: str, action: str) -> tuple[str | None, str | None]:
+    """Save the grader's marks (raw: criterion name -> typed value). Releasing needs every part marked and, for a
+    flagged submission, the grader's integrity decision first: a suggestion never slips through unchecked.
+    Returns (error, state); a bad number saves nothing, a blocked release still saves the draft."""
+    with session_scope() as db:
+        sub = db.get(Submission, sid)
+        if not sub:
+            raise HTTPException(404)
         scores, missing = {}, []
-        for i, c in enumerate(rubric(sub.assignment)):
-            raw = str(form.get(f"score_{i}", "")).strip()
-            if not raw:
+        for c in rubric(sub.assignment):
+            typed = str(raw.get(c["name"], "")).strip()
+            if not typed:
                 missing.append(c["name"])
                 continue
             try:
-                v = float(raw)
+                v = float(typed)
             except ValueError:
                 v = -1
             if not 0 <= v <= c["points"]:
-                return RedirectResponse(f"/s/{sid}?err={c['name']}:+enter+a+number+from+0+to+{c['points']:g}.", 303)
+                return f"{c['name']}: enter a number from 0 to {c['points']:g}.", None
             scores[c["name"]] = v
         m = db.get(Mark, sid)
         if m is None:
             m = Mark(submission_id=sid)
             db.add(m)
-        m.scores_json, m.feedback = scores, str(form.get("feedback", "")).strip() or None
+        m.scores_json, m.feedback = scores, feedback.strip() or None
         m.total = sum(scores.values()) if scores else None
         err = None
         if action.startswith("release"):
@@ -509,13 +559,7 @@ async def mark_route(request: Request, sid: int):
             elif missing:
                 err = f"Give marks for {', '.join(missing)} before releasing."
         m.status = "released" if action.startswith("release") and not err else "draft"
-        state = m.status
-    if err:
-        return RedirectResponse(f"/s/{sid}?err={err.replace(' ', '+')}", 303)
-    nxt = str(form.get("next", ""))
-    if action == "release_next" and nxt.isdigit():
-        return RedirectResponse(f"/s/{nxt}?saved_prev={sid}", 303)
-    return RedirectResponse(f"/s/{sid}?saved_mark={'unreleased' if action == 'unrelease' else state}", 303)
+        return err, m.status
 
 
 @app.post("/s/{sid}/review")
@@ -777,3 +821,8 @@ def whitelist_delete(kind: str = Form(...), reason: str = Form(""), scope: str =
         for w in db.scalars(q):
             db.delete(w)
     return RedirectResponse("/settings?msg=Removed.+Re-scan+the+assignment+to+apply.", 303)
+
+
+from checker.app import api  # noqa: E402  (JSON API for the React front end; needs the helpers above)
+
+app.include_router(api.router)

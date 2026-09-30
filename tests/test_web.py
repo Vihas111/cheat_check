@@ -10,10 +10,13 @@ from tests.synth.generate import make_pdf, screenshot
 
 
 @pytest.fixture
-def client(data_dir, monkeypatch):
+def client(data_dir, monkeypatch, tmp_path):
     monkeypatch.setenv("CHECKER_OCR_ENGINE", "none")  # hashes only; keeps the test fast
     ocr.get_engine.cache_clear()
+    from checker.app import main
     from checker.app.main import app
+
+    monkeypatch.setattr(main, "SPA", tmp_path / "no-spa")  # these tests cover the server-rendered pages
 
     with TestClient(app) as c:
         yield c
