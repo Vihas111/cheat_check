@@ -14,7 +14,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from checker.app.worker import Worker
 from checker.config import PIPELINE_VERSION, get_settings, save_overrides
@@ -24,6 +24,7 @@ from checker.core.db import (
     Assignment,
     Base,
     Flag,
+    Grade,
     Item,
     Job,
     Mark,
@@ -811,6 +812,45 @@ def erase_all(confirm: str = Form("")):
     for folder in ("pdfs", "images", "inbox"):
         shutil.rmtree(root / folder, ignore_errors=True)
     return RedirectResponse("/settings?msg=All+data+erased.", 303)
+
+
+def delete_assignment(aid: int) -> str | None:
+    """Delete one assignment with its submissions, grades, decisions and stored files. Other assignments,
+    settings and the roster are kept. Returns the assignment name, or None if it does not exist."""
+    with session_scope() as db:
+        a = db.get(Assignment, aid)
+        if not a:
+            return None
+        name = a.name
+        subs = db.scalars(select(Submission).where(Submission.assignment_id == aid)).all()
+        sub_ids = [x.id for x in subs]
+        shas = {x.sha256 for x in subs}
+        thumbs = set(db.scalars(select(Item.thumb_path).where(Item.submission_id.in_(sub_ids))).all())
+        student_pks = {x.student_pk for x in subs if x.student_pk}
+        for x in subs:  # children go with them (items, shingles, matches, flags, reviews, marks, jobs)
+            db.delete(x)
+        db.flush()
+        db.execute(delete(Grade).where(Grade.assignment_id == aid))
+        db.execute(delete(Whitelist).where(Whitelist.scope == name))
+        db.delete(a)
+        db.flush()
+        # files no remaining submission uses
+        kept_shas = set(db.scalars(select(Submission.sha256).where(Submission.sha256.in_(shas))).all())
+        kept_thumbs = set(db.scalars(select(Item.thumb_path).where(Item.thumb_path.in_(thumbs))).all())
+        # students made only from filenames, now without any submission
+        for pk in student_pks:
+            st = db.get(Student, pk)
+            if st and not (st.name or st.username or st.email) and not db.scalar(
+                    select(func.count()).select_from(Submission).where(Submission.student_pk == pk)):
+                db.delete(st)
+    root = get_settings().data_dir
+    for sha in shas - kept_shas:
+        (root / "pdfs" / f"{sha}.pdf").unlink(missing_ok=True)
+    for t in thumbs - kept_thumbs:
+        if t:
+            (root / t).unlink(missing_ok=True)
+    shutil.rmtree(root / "inbox" / name, ignore_errors=True)  # or the watcher would bring the files back
+    return name
 
 
 @app.post("/settings/whitelist/delete")

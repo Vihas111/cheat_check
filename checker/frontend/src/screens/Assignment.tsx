@@ -42,7 +42,7 @@ function SubRow({ row, max, wide, index }: { row: Row; max: number; wide: boolea
   const sub = row.student?.name ? row.filename : row.student?.student_id ?? "";
   return (
     <Reveal delay={Math.min(index, 12) * 30} y={6}>
-      <Tappable onPress={() => navigate(`/s/${row.id}`)} label={name} style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
+      <Tappable href={`/s/${row.id}`} onPress={() => navigate(`/s/${row.id}`)} label={name} style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 12, minHeight: 60 }}>
           <View style={{ flex: 2.2, minWidth: 0 }}>
             <T v="bodyStrong" numberOfLines={1}>{name}</T>
@@ -84,7 +84,7 @@ export function AssignmentScreen({ aid }: { aid: string }) {
   const c = useColors();
   const { navigate } = useRouter();
   const meta = useMeta();
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const [query, setQuery] = useQuery();
@@ -128,6 +128,16 @@ export function AssignmentScreen({ aid }: { aid: string }) {
   const waiting = (d.verify.awaiting ?? 0) + (d.verify.recheck ?? 0);
   const filtered = !!(grade || status || tier || q);
   const download = (p: string) => { window.location.href = p; };
+  const remove = async () => {
+    if (!(await confirm(`Delete ${a.name} and its ${d.total} ${d.total === 1 ? "submission" : "submissions"}, grades and integrity decisions? Other assignments are not touched. This cannot be undone.`, { confirmLabel: `Delete ${a.name}`, danger: true }))) return;
+    try {
+      await api.del(`/a/${aid}`);
+      toast(`${a.name} deleted.`);
+      navigate("/");
+    } catch (e) {
+      toast((e as Error).message, { tone: "error" });
+    }
+  };
 
   const bar = (
     <AppBar
@@ -143,6 +153,8 @@ export function AssignmentScreen({ aid }: { aid: string }) {
             "divider",
             { label: "Export grades (CSV)", onPress: () => download(`/a/${aid}/grades.csv`) },
             { label: "Export integrity report (CSV)", onPress: () => download(`/a/${aid}/export.csv`) },
+            "divider",
+            { label: "Delete this assignment…", onPress: remove },
           ]} />
           <Button label="Setup" onPress={() => navigate(`/a/${aid}/setup`)} />
           <FilePicker accept="application/pdf,.pdf" onFiles={uploader.send}>{(open) => <Button variant="primary" icon="upload" label="Add PDFs" onPress={open} />}</FilePicker>
@@ -219,6 +231,9 @@ export function AssignmentScreen({ aid }: { aid: string }) {
                 ...Object.entries(meta.decision).map(([k, v]) => ({ value: k, label: `Decided: ${v.toLowerCase()}` }))]} />
             <Select label="Similarity" width={180} value={tier} onChange={(v) => setQuery({ tier: v })}
               options={[{ value: "", label: "Any similarity" }, ...Object.entries(meta.tier).map(([k, v]) => ({ value: k, label: v }))]} />
+            <T v="footnote" c="inkSecondary" accessibilityLiveRegion="polite">
+              {filtered ? `Showing ${d.rows.length} of ${d.total}` : `${d.total} ${d.total === 1 ? "submission" : "submissions"}`}
+            </T>
             {filtered ? <Button variant="plain" label="Clear" onPress={() => { setSearch(""); setQuery({ grade: "", status: "", tier: "", q: "" }); }} /> : null}
           </View>
           {d.rows.length ? (

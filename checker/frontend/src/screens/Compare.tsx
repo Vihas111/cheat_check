@@ -57,7 +57,7 @@ export function CompareScreen({ mid }: { mid: string }) {
           {data.siblings.map((id, i) => {
             const on = id === data.id;
             return (
-              <Tappable key={id} onPress={() => navigate(`/m/${id}`)} label={`Match ${i + 1}`} style={{ minWidth: 34, height: 34, borderRadius: radii.sm, backgroundColor: on ? c.anchorSurface : c.surfaceAlt, alignItems: "center", justifyContent: "center" }}>
+              <Tappable key={id} href={`/m/${id}`} onPress={() => navigate(`/m/${id}`)} label={`Match ${i + 1}`} style={{ minWidth: 34, height: 34, borderRadius: radii.sm, backgroundColor: on ? c.anchorSurface : c.surfaceAlt, alignItems: "center", justifyContent: "center" }}>
                 <T v="footnote" style={{ color: on ? c.onAnchor : c.ink, fontWeight: "600" }}>{i + 1}</T>
               </Tappable>
             );

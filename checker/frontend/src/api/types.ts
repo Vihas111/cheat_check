@@ -11,7 +11,7 @@ export type Row = {
   tier: string | null; coverage: number | null; top: { filename: string } | null;
 };
 export type Dashboard = {
-  assignment: Assignment; rows: Row[]; counts: { queued: number; processing: number; done: number; failed: number };
+  assignment: Assignment; rows: Row[]; total: number; counts: { queued: number; processing: number; done: number; failed: number };
   verify: Record<string, number>; grades: Record<string, number>; failed: { filename: string; error: string }[];
   wl_count: number; has_roster: boolean; rescanning: boolean; compared: { seed: number; reference: number }; inbox: string;
 };

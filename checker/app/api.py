@@ -94,7 +94,7 @@ def assignment(aid: int, tier: str = "", status: str = "", q: str = "", grade: s
         compared = Counter("seed" if s.is_seed else "reference" for s in db.scalars(
             select(Submission).where(Submission.assignment_id == aid, Submission.is_seed | Submission.is_reference)))
         return {
-            "assignment": assignment_json(a), "rows": [row_json(r) for r in rows],
+            "assignment": assignment_json(a), "rows": [row_json(r) for r in rows], "total": len(everyone),
             "counts": M.job_counts(db, aid), "verify": dict(Counter(r["verify"] for r in everyone)),
             "grades": dict(Counter(r["mark"].status if r["mark"] else "none" for r in everyone if r["gradable"])),
             "failed": [{"filename": f, "error": (e or "unknown error")[:300]} for f, e in failed],
@@ -130,6 +130,13 @@ def assignment_name(aid: int) -> str:
         if not a:
             raise HTTPException(404)
         return a.name
+
+
+@router.delete("/a/{aid}")
+def delete_assignment(aid: int):
+    if M.delete_assignment(aid) is None:
+        raise HTTPException(404)
+    return {"ok": True}
 
 
 @router.post("/a/{aid}/rescan")

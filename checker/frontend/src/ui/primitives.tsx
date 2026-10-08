@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createElement, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Pressable,
@@ -159,15 +159,30 @@ export function IconButton({ icon, onPress, label, size = 40 }: { icon: string; 
 }
 
 /** A pressable block that navigates or acts, with hover and press feedback. */
-export function Tappable({ onPress, children, style, label }: { onPress: () => void; children: ReactNode; style?: StyleProp<ViewStyle>; label?: string }) {
+export function Tappable({ onPress, children, style, label, href }: { onPress: () => void; children: ReactNode; style?: StyleProp<ViewStyle>; label?: string; href?: string }) {
   const c = useColors();
-  return (
+  const press = (
     <Pressable
-      accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
+      accessibilityRole={href ? undefined : "button"} accessibilityLabel={label} onPress={href ? undefined : onPress}
       style={({ hovered, pressed }) => [web({ cursor: "pointer", backgroundColor: pressed ? c.surfaceHover : hovered ? c.surfaceAlt : "transparent", transitionProperty: "background-color", transitionDuration: "120ms" }), style]}
     >
       {children}
     </Pressable>
+  );
+  if (!href) return press;
+  // A real link: right-click, middle-click and Ctrl/Cmd-click open it in a new tab. A plain click stays in the app.
+  return createElement(
+    "a",
+    {
+      href, "aria-label": label, draggable: false,
+      style: { display: "block", color: "inherit", textDecoration: "none" },
+      onClick: (e: MouseEvent) => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        onPress();
+      },
+    },
+    press,
   );
 }
 
