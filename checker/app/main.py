@@ -593,6 +593,37 @@ def ignore_item(iid: int, back: str = Form("/")):
     return RedirectResponse(back if back.startswith("/") else "/", 303)
 
 
+def item_lines(it: Item) -> list[str]:
+    """The readable lines of an item's text, in the order the front end shows them (indexes are stable)."""
+    return [ln.strip() for ln in (it.ocr_text or "").splitlines() if ln.strip()]
+
+
+def ignore_text(iid: int, indexes: list[int]) -> str | None:
+    """Ignore only the chosen lines of an item (for example the question, not the answer) in its assignment.
+    Returns the assignment name, or an error message starting with '!'."""
+    from checker.core.ingest import text_fingerprints
+    from checker.core.normalize import normalize_text
+    with session_scope() as db:
+        it = db.get(Item, iid)
+        if not it:
+            return None
+        lines = item_lines(it)
+        chosen = [lines[i] for i in sorted(set(indexes)) if 0 <= i < len(lines)]
+        norm = normalize_text("\n".join(chosen))
+        hashes = set().union(*text_fingerprints(norm).values()) if norm else set()
+        if not hashes:
+            return "!That is too short to recognise. Select at least a few words."
+        snippet = " ".join(chosen)
+        snippet = snippet[:70] + ("…" if len(snippet) > 70 else "")
+        name = it.submission.assignment.name
+        reason = f'ignored text "{snippet}"'
+        for h in hashes:
+            db.add(Whitelist(kind="shingle", fingerprint=str(h), scope=name, reason=reason))
+    if worker:
+        worker.rescan_async(name)
+    return name
+
+
 # ---------------- comparison viewer ----------------
 
 @app.get("/m/{mid}", response_class=HTMLResponse)

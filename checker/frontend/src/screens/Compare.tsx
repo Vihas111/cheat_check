@@ -5,11 +5,12 @@ import type { Compare, Panel } from "../api/types";
 import { useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page } from "../ui/chrome";
+import { IgnoreText } from "../ui/IgnoreText";
 import { Card, Disclosure, LinkText, Reveal, T, Tappable } from "../ui/primitives";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function PanelCard({ p }: { p: Panel }) {
+function PanelCard({ p, assignment }: { p: Panel; assignment: string }) {
   const c = useColors();
   const { navigate } = useRouter();
   return (
@@ -23,6 +24,7 @@ function PanelCard({ p }: { p: Panel }) {
           <T v="mono" style={{ backgroundColor: c.surfaceAlt, padding: spacing.ms, borderRadius: radii.sm }}>
             {p.chunks.map(([text, hit], i) => (hit ? <T key={i} v="mono" style={{ backgroundColor: c.accentSoft, color: c.ink, fontWeight: "700" }}>{text + " "}</T> : text + " "))}
           </T>
+          <IgnoreText itemId={p.item_id} lines={p.lines} assignment={assignment} />
         </>
       ) : null}
     </Card>
@@ -67,8 +69,8 @@ export function CompareScreen({ mid }: { mid: string }) {
 
       <Reveal delay={60}>
         <View style={{ flexDirection: width >= 760 ? "row" : "column", gap: spacing.md, alignItems: "flex-start" }}>
-          <PanelCard p={data.a} />
-          <PanelCard p={data.b} />
+          <PanelCard p={data.a} assignment={data.assignment.name} />
+          <PanelCard p={data.b} assignment={data.assignment.name} />
         </View>
       </Reveal>
 

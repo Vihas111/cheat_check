@@ -21,7 +21,7 @@ export type Meta = {
 };
 export type Source = { submission_id: number; filename: string; share: number; items: number; is_reference?: boolean };
 export type Item = {
-  id: number; page: number; label: string; weight: number | null; df: number | null; thumb: string | null; text: string;
+  id: number; page: number; label: string; weight: number | null; df: number | null; thumb: string | null; text: string; lines: string[];
   matched: boolean; matches: { id: number; filename: string; submission_id: number; what: string }[];
 };
 export type Submission = {
@@ -36,7 +36,7 @@ export type Submission = {
   items: Item[]; meta: { heads: string[]; rows: string[][] };
 };
 export type Panel = {
-  submission_id: number; filename: string; label: string; thumb: string | null; text_title: string; chunks: [string, boolean][];
+  item_id: number; lines: string[]; submission_id: number; filename: string; label: string; thumb: string | null; text_title: string; chunks: [string, boolean][];
 };
 export type Compare = {
   id: number; kind: string; summary: string; assignment: { id: number; name: string }; siblings: number[];

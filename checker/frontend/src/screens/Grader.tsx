@@ -7,6 +7,7 @@ import { fmt, pct, useMeta, when } from "../meta";
 import { useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, useFeedback } from "../ui/chrome";
+import { IgnoreText } from "../ui/IgnoreText";
 import {
   Button, Card, Choices, Disclosure, Dot, Field, Icon, LinkText, Pill, Reveal, Segmented, T, Tappable, Tier, web,
 } from "../ui/primitives";
@@ -296,6 +297,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
                 ))}
                 {it.matches.length > 5 ? <T v="caption" c="inkTertiary">{it.matches.length - 5} more</T> : null}
                 <LinkText v="caption" onPress={() => ignore(it)} style={{ marginTop: 4 }}>Ignore everywhere, it is given material</LinkText>
+                <IgnoreText itemId={it.id} lines={it.lines} assignment={sub.assignment.name} onDone={reload} />
               </View>
             ) : null}
           </View>
