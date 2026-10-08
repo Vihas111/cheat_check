@@ -3,7 +3,7 @@ import { Image, View, useWindowDimensions } from "react-native";
 
 import { api, useGet, useInterval } from "../api/client";
 import type { Item, Submission } from "../api/types";
-import { fmt, pct, useMeta, when } from "../meta";
+import { fmt, GRADE_LABEL, pct, useMeta, when } from "../meta";
 import { subPath, useFilterQs, useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, useFeedback } from "../ui/chrome";
@@ -406,8 +406,11 @@ export function GraderScreen({ sid }: { sid: string }) {
   if (!data) return <View style={web({ minHeight: "100vh" })}><AppBar title="Submission" crumbs={[{ label: "Assignments", to: "/" }]} /><Loading error={error} retry={reload} /></View>;
 
   const a = data.assignment;
+  const FILTER_NAMES: Record<string, string> = { grade: "grade", status: "integrity", tier: "similarity", flagged: "flags", q: "search" };
+  const label = (k: string, v: string) => (k === "tier" ? meta.tier[v] : k === "grade" ? GRADE_LABEL[v] : k === "flagged" ? (v === "yes" ? "has flags" : "nothing flagged") : k === "status" ? (meta.decision[v] ?? ({ awaiting: "awaiting your decision", decided: "decided" } as Record<string, string>)[v]) : v) ?? v;
+  const filterText = [...new URLSearchParams(qs)].map(([k, v]) => `${FILTER_NAMES[k] ?? k}: ${label(k, v)}`).join(", ");
   const name = data.student?.name || data.filename;
-  const subtitle = [data.student ? data.student.student_id : "", data.student?.name ? data.filename : "", `${data.page_count || 0} pages`].filter(Boolean).join(", ");
+  const subtitle = [data.student ? data.student.student_id : "", data.student?.name ? data.filename : "", `${data.page_count || 0} pages`].filter(Boolean).join(", ") + (data.nav.filtered ? `. Filter, ${filterText}` : "");
   const needsCheck = data.verify === "awaiting" || data.verify === "recheck";
 
   const bar = (
@@ -416,8 +419,13 @@ export function GraderScreen({ sid }: { sid: string }) {
       crumbs={[{ label: "Assignments", to: "/" }, { label: a.name, to: `/a/${a.id}${qs ? "?" + qs : ""}` }]}
       actions={
         <>
-          {data.nav.filtered ? <Pill label="Filtered list" tone="anchor" /> : null}
-          {data.nav.pos >= 0 ? <T v="footnote" c="inkTertiary">{data.nav.pos + 1} of {data.nav.count}</T> : data.nav.filtered ? <T v="footnote" c="inkTertiary">{data.nav.count} in the filtered list</T> : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Pill label={data.nav.filtered ? "Filtered" : "All submissions"} tone={data.nav.filtered ? "anchor" : "neutral"} />
+            <T v="footnote" c="inkSecondary">
+              {data.nav.pos >= 0 ? `${data.nav.pos + 1} of ${data.nav.count}` : `${data.nav.count} ${data.nav.filtered ? "in this filter" : "total"}`}
+            </T>
+            {data.nav.filtered ? <Button small variant="plain" label="Clear filter" title="Stop filtering and move through every submission" onPress={() => navigate(subPath(sid, "", query.get("tab") ? `tab=${query.get("tab")}` : ""))} /> : null}
+          </View>
           <Button label="Previous" title="Previous submission ( [ )" disabled={!data.nav.prev} onPress={() => navigate(subPath(data.nav.prev!, qs))} />
           <Button label="Next" title="Next submission ( ] )" disabled={!data.nav.next} onPress={() => navigate(subPath(data.nav.next!, qs))} />
           <Button label="Open PDF" onPress={() => window.open(`/s/${sid}/pdf`, "_blank", "noopener")} />

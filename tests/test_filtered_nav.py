@@ -38,17 +38,24 @@ def test_nav_follows_filter(client, tmp_path):
         time.sleep(0.5)
     ids = {r["filename"][:2]: r["id"] for r in client.get(f"/api/a/{aid}").json()["rows"]}
 
-    clear = client.get(f"/api/a/{aid}?status=clear").json()
+    clear = client.get(f"/api/a/{aid}?flagged=no").json()
     assert sorted(r["filename"][:2] for r in clear["rows"]) == ["B2", "D4"] and clear["total"] == 4
 
-    nav = client.get(f"/api/s/{ids['B2']}?status=clear").json()["nav"]
+    nav = client.get(f"/api/s/{ids['B2']}?flagged=no").json()["nav"]
     assert (nav["prev"], nav["next"], nav["count"], nav["filtered"]) == (None, ids["D4"], 2, True)
-    assert client.get(f"/api/s/{ids['D4']}?status=clear").json()["nav"]["prev"] == ids["B2"]
+    assert client.get(f"/api/s/{ids['D4']}?flagged=no").json()["nav"]["prev"] == ids["B2"]
 
     flagged = client.get(f"/api/s/{ids['A1']}?status=awaiting").json()["nav"]
     assert flagged["next"] in (ids["C3"], None) and flagged["count"] == 2
 
     # a submission outside the filter still gets sensible neighbours inside it, and no filter means everyone
-    outside = client.get(f"/api/s/{ids['C3']}?status=clear").json()["nav"]
+    outside = client.get(f"/api/s/{ids['C3']}?flagged=no").json()["nav"]
     assert outside["pos"] == -1 and outside["prev"] == ids["B2"] and outside["next"] == ids["D4"]
     assert client.get(f"/api/s/{ids['B2']}").json()["nav"]["count"] == 4
+
+    # "nothing flagged" is independent of the integrity state, so the two combine
+    assert [r["filename"][:2] for r in client.get(f"/api/a/{aid}?flagged=yes").json()["rows"]] == ["A1", "C3"]
+    assert client.get(f"/api/a/{aid}?flagged=no&status=awaiting").json()["rows"] == []
+    client.post(f"/api/s/{ids['B2']}/review", json={"status": "false_positive"})
+    both = client.get(f"/api/a/{aid}?flagged=no&status=decided").json()["rows"]
+    assert [r["filename"][:2] for r in both] == ["B2"]

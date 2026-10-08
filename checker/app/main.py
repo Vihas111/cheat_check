@@ -278,7 +278,7 @@ def verification(sub: Submission, flags, review: Review | None) -> str:
     return "awaiting" if flagged else "not_needed"
 
 
-def dashboard_rows(db, aid: int, tier: str = "", status: str = "", q: str = "", grade: str = ""):
+def dashboard_rows(db, aid: int, tier: str = "", status: str = "", q: str = "", grade: str = "", flagged: str = ""):
     subs = db.scalars(select(Submission).where(Submission.assignment_id == aid)).all()
     reviews = latest_reviews(db, [s.id for s in subs])
     marks = {m.submission_id: m for m in db.scalars(select(Mark).where(Mark.submission_id.in_([s.id for s in subs])))}
@@ -300,8 +300,9 @@ def dashboard_rows(db, aid: int, tier: str = "", status: str = "", q: str = "", 
             continue
         if status == "awaiting" and row["verify"] not in ("awaiting", "recheck"):
             continue
-        if status == "clear" and row["verify"] != "not_needed":
-            continue
+        if flagged in ("yes", "no"):  # independent of the integrity state: has the check suggested anything?
+            if row["verify"] is None or (row["tier"] in ("HIGH", "MEDIUM") or bool(row["flags"])) != (flagged == "yes"):
+                continue
         if status in (*DECISIONS, "decided") and row["verify"] != "decided":
             continue
         if grade and (not row["gradable"] or (row["mark"].status if row["mark"] else "none") != grade):

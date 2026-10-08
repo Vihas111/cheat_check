@@ -117,11 +117,11 @@ export function AssignmentScreen({ aid }: { aid: string }) {
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const [query, setQuery] = useQuery();
-  const grade = query.get("grade") ?? "", status = query.get("status") ?? "", tier = query.get("tier") ?? "", q = query.get("q") ?? "";
+  const grade = query.get("grade") ?? "", status = query.get("status") ?? "", tier = query.get("tier") ?? "", flagged = query.get("flagged") ?? "", q = query.get("q") ?? "";
   const [search, setSearch] = useState(q);
   const ring = useFocusRing();
 
-  const path = `/a/${aid}?` + new URLSearchParams({ grade, status, tier, q }).toString();
+  const path = `/a/${aid}?` + new URLSearchParams({ grade, status, tier, flagged, q }).toString();
   const page = useGet<Dashboard>(path);
   const stat = useGet<Status>(`/a/${aid}/status`);
   const d = page.data;
@@ -155,7 +155,7 @@ export function AssignmentScreen({ aid }: { aid: string }) {
   const s = stat.data ?? { ...d.counts, rescanning: d.rescanning, stamp: "" };
   const gradable = Object.values(d.grades).reduce((x, y) => x + y, 0);
   const waiting = (d.verify.awaiting ?? 0) + (d.verify.recheck ?? 0);
-  const filtered = !!(grade || status || tier || q);
+  const filtered = !!(grade || status || tier || flagged || q);
   const download = (p: string) => { window.location.href = p; };
   const remove = async () => {
     if (!(await confirm(`Delete ${a.name} and its ${d.total} ${d.total === 1 ? "submission" : "submissions"}, grades and integrity decisions? Other assignments are not touched. This cannot be undone.`, { confirmLabel: `Delete ${a.name}`, danger: true }))) return;
@@ -257,14 +257,16 @@ export function AssignmentScreen({ aid }: { aid: string }) {
             <Select label="Grade status" width={150} value={grade} onChange={(v) => setQuery({ grade: v })}
               options={[{ value: "", label: "All grades" }, { value: "none", label: "Not graded" }, { value: "draft", label: "Draft" }, { value: "released", label: "Released" }]} />
             <Select label="Integrity" width={230} value={status} onChange={(v) => setQuery({ status: v })}
-              options={[{ value: "", label: "Any integrity state" }, { value: "awaiting", label: "Awaiting your decision" }, { value: "clear", label: "Nothing flagged" }, { value: "decided", label: "Decided" },
+              options={[{ value: "", label: "Any integrity state" }, { value: "awaiting", label: "Awaiting your decision" }, { value: "decided", label: "Decided" },
                 ...Object.entries(meta.decision).map(([k, v]) => ({ value: k, label: `Decided: ${v.toLowerCase()}` }))]} />
+            <Select label="Flags" width={170} value={flagged} onChange={(v) => setQuery({ flagged: v })}
+              options={[{ value: "", label: "Flagged or not" }, { value: "yes", label: "Has flags" }, { value: "no", label: "Nothing flagged" }]} />
             <Select label="Similarity" width={180} value={tier} onChange={(v) => setQuery({ tier: v })}
               options={[{ value: "", label: "Any similarity" }, ...Object.entries(meta.tier).map(([k, v]) => ({ value: k, label: v }))]} />
             <T v="footnote" c="inkSecondary" accessibilityLiveRegion="polite">
               {filtered ? `Showing ${d.rows.length} of ${d.total}` : `${d.total} ${d.total === 1 ? "submission" : "submissions"}`}
             </T>
-            {filtered ? <Button variant="plain" label="Clear" onPress={() => { setSearch(""); setQuery({ grade: "", status: "", tier: "", q: "" }); }} /> : null}
+            {filtered ? <Button variant="plain" label="Clear" onPress={() => { setSearch(""); setQuery({ grade: "", status: "", tier: "", flagged: "", q: "" }); }} /> : null}
           </View>
           {d.rows.length ? (
             <View>
@@ -275,11 +277,11 @@ export function AssignmentScreen({ aid }: { aid: string }) {
                 <T v="footnote" c="inkSecondary" style={{ flex: 1.5 }}>Integrity</T>
                 {wide ? <T v="footnote" c="inkSecondary" style={{ flex: 2 }}>Similarity</T> : null}
               </View>
-              {d.rows.map((r, i) => <SubRow key={r.id} row={r} max={a.max_score} wide={wide} index={i} qs={new URLSearchParams(Object.entries({ grade, status, tier, q }).filter(([, v]) => v)).toString()} />)}
+              {d.rows.map((r, i) => <SubRow key={r.id} row={r} max={a.max_score} wide={wide} index={i} qs={new URLSearchParams(Object.entries({ grade, status, tier, flagged, q }).filter(([, v]) => v)).toString()} />)}
             </View>
           ) : (
             <View style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
-              <Empty>{status === "awaiting" ? "Nothing is waiting for your integrity decision." : status === "clear" && !grade && !tier && !q ? "Every submission has something flagged." : filtered ? "No submissions match these filters." : "No submissions yet. Drop PDFs here or use Add PDFs."}</Empty>
+              <Empty>{status === "awaiting" ? "Nothing is waiting for your integrity decision." : flagged === "no" && !grade && !tier && !status && !q ? "Every submission has something flagged." : filtered ? "No submissions match these filters." : "No submissions yet. Drop PDFs here or use Add PDFs."}</Empty>
             </View>
           )}
         </Card>
