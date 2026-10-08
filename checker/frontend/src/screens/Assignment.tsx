@@ -8,7 +8,7 @@ import { subPath, useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page, useFeedback, useWindowDrop } from "../ui/chrome";
 import {
-  Button, Card, Disclosure, Dot, Empty, FilePicker, Icon, Menu, Pill, ProgressBar, Reveal, Select, T, Tappable, Tier, useFocusRing, web,
+  Button, Card, Disclosure, Dot, Empty, FilePicker, Icon, LinkText, Menu, Pill, ProgressBar, Reveal, Select, T, Tappable, Tier, useFocusRing, web,
 } from "../ui/primitives";
 import { useUploader } from "../upload";
 
@@ -63,7 +63,7 @@ function GradePill({ row }: { row: Row }) {
   return <Pill label={(s === "released" ? "✓ " : "") + GRADE_LABEL[s]} tone={s === "released" ? "positive" : s === "draft" ? "anchor" : "neutral"} />;
 }
 
-function SubRow({ row, max, wide, index, qs }: { row: Row; max: number; wide: boolean; index: number; qs: string }) {
+function SubRow({ row, max, wide, index, qs, onDelete }: { row: Row; max: number; wide: boolean; index: number; qs: string; onDelete: (row: Row) => void }) {
   const c = useColors();
   const { navigate } = useRouter();
   const meta = useMeta();
@@ -71,7 +71,9 @@ function SubRow({ row, max, wide, index, qs }: { row: Row; max: number; wide: bo
   const sub = row.student?.name ? row.filename : row.student?.student_id ?? "";
   return (
     <Reveal delay={Math.min(index, 12) * 30} y={6}>
-      <Tappable href={subPath(row.id, qs)} onPress={() => navigate(subPath(row.id, qs))} label={name} style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
+      <View style={{ flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: c.hairline }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+      <Tappable href={subPath(row.id, qs)} onPress={() => navigate(subPath(row.id, qs))} label={name}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 12, minHeight: 60 }}>
           <View style={{ flex: 2.2, minWidth: 0 }}>
             <T v="bodyStrong" numberOfLines={1}>{name}</T>
@@ -105,6 +107,11 @@ function SubRow({ row, max, wide, index, qs }: { row: Row; max: number; wide: bo
           ) : null}
         </View>
       </Tappable>
+      </View>
+      <View style={{ paddingHorizontal: spacing.md }}>
+        <LinkText v="caption" onPress={() => onDelete(row)} style={{ color: c.negative }}>Delete</LinkText>
+      </View>
+      </View>
     </Reveal>
   );
 }
@@ -157,6 +164,31 @@ export function AssignmentScreen({ aid }: { aid: string }) {
   const waiting = (d.verify.awaiting ?? 0) + (d.verify.recheck ?? 0);
   const filtered = !!(grade || status || tier || flagged || q);
   const download = (p: string) => { window.location.href = p; };
+  const removeFile = async (row: Row) => {
+    const label = row.student?.name || row.filename;
+    if (!(await confirm(`Delete ${label} (${row.filename})? Its marks, grade and integrity results are removed too, and the other submissions are re-scanned without it. This cannot be undone.`, { confirmLabel: "Delete this file", danger: true }))) return;
+    try {
+      await api.post(`/a/${aid}/delete-files`, { ids: [row.id] });
+      toast(`${label} deleted. Re-scanning.`);
+      onDone();
+    } catch (e) {
+      toast((e as Error).message, { tone: "error" });
+    }
+  };
+  const releaseAll = async () => {
+    const n = d.grades.draft ?? 0;
+    if (!(await confirm(`Release all ${n} draft ${n === 1 ? "grade" : "grades"}? A draft that is incomplete, still being checked, or flagged and waiting for your integrity decision is skipped, and you are told which.`, { confirmLabel: `Release ${n}` }))) return;
+    try {
+      const r = await api.post<{ released: number; held: { id: number; filename: string; reason: string }[] }>(`/a/${aid}/release-drafts`);
+      const why: Record<string, number> = {};
+      r.held.forEach((h) => { const k = /integrity decision/.test(h.reason) ? "waiting for your integrity decision" : /Give marks/.test(h.reason) ? "missing marks" : /still running/.test(h.reason) ? "still being checked" : "not ready"; why[k] = (why[k] ?? 0) + 1; });
+      const held = Object.entries(why).map(([k, v]) => `${v} ${k}`).join(", ");
+      toast(`Released ${r.released} ${r.released === 1 ? "grade" : "grades"}.${r.held.length ? ` ${r.held.length} held back: ${held}.` : ""}`, r.held.length ? { action: { label: "Show them", onPress: () => setQuery({ grade: "draft", status: "", tier: "", flagged: "", q: "" }) } } : undefined);
+      onDone();
+    } catch (e) {
+      toast((e as Error).message, { tone: "error" });
+    }
+  };
   const remove = async () => {
     if (!(await confirm(`Delete ${a.name} and its ${d.total} ${d.total === 1 ? "submission" : "submissions"}, grades and integrity decisions? Other assignments are not touched. This cannot be undone.`, { confirmLabel: `Delete ${a.name}`, danger: true }))) return;
     try {
@@ -180,11 +212,13 @@ export function AssignmentScreen({ aid }: { aid: string }) {
             { label: "Similar groups", onPress: () => navigate(`/a/${aid}/clusters`) },
             { label: "Calibrate the similarity check", onPress: () => navigate(`/a/${aid}/calibrate`) },
             "divider",
+            { label: "Release all drafts…", onPress: releaseAll },
             { label: "Export grades (CSV)", onPress: () => download(`/a/${aid}/grades.csv`) },
             { label: "Export integrity report (CSV)", onPress: () => download(`/a/${aid}/export.csv`) },
             "divider",
             { label: "Delete this assignment…", onPress: remove },
           ]} />
+          {(d.grades.draft ?? 0) > 0 ? <Button label={`Release ${d.grades.draft} ${d.grades.draft === 1 ? "draft" : "drafts"}`} title="Turn every draft grade into a released grade" onPress={releaseAll} /> : null}
           <Button label="Setup" onPress={() => navigate(`/a/${aid}/setup`)} />
           <FilePicker accept="application/pdf,.pdf" onFiles={uploader.send}>{(open) => <Button variant="primary" icon="upload" label="Add PDFs" onPress={open} />}</FilePicker>
         </>
@@ -277,7 +311,7 @@ export function AssignmentScreen({ aid }: { aid: string }) {
                 <T v="footnote" c="inkSecondary" style={{ flex: 1.5 }}>Integrity</T>
                 {wide ? <T v="footnote" c="inkSecondary" style={{ flex: 2 }}>Similarity</T> : null}
               </View>
-              {d.rows.map((r, i) => <SubRow key={r.id} row={r} max={a.max_score} wide={wide} index={i} qs={new URLSearchParams(Object.entries({ grade, status, tier, flagged, q }).filter(([, v]) => v)).toString()} />)}
+              {d.rows.map((r, i) => <SubRow key={r.id} row={r} max={a.max_score} wide={wide} index={i} onDelete={removeFile} qs={new URLSearchParams(Object.entries({ grade, status, tier, flagged, q }).filter(([, v]) => v)).toString()} />)}
             </View>
           ) : (
             <View style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>

@@ -344,7 +344,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
 export function GraderScreen({ sid }: { sid: string }) {
   const c = useColors();
   const { navigate, route } = useRouter();
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useQuery();
   const qs = useFilterQs();
@@ -419,6 +419,18 @@ export function GraderScreen({ sid }: { sid: string }) {
   const name = data.student?.name || data.filename;
   const subtitle = [data.student ? data.student.student_id : "", data.student?.name ? data.filename : "", `${data.page_count || 0} pages`].filter(Boolean).join(", ") + (data.nav.filtered ? `. Filter, ${filterText}` : "");
   const needsCheck = data.verify === "awaiting" || data.verify === "recheck";
+  const deleteFile = async () => {
+    if (!(await confirm(`Delete ${name} (${data.filename})? Its marks, grade and integrity results are removed too, and the other submissions are re-scanned without it. This cannot be undone.`, { confirmLabel: "Delete this file", danger: true }))) return;
+    try {
+      await api.post(`/a/${a.id}/delete-files`, { ids: [data.id] });
+      toast(`${name} deleted. Re-scanning.`);
+      const go = data.nav.next ?? data.nav.prev;
+      setDirty(false);
+      navigate(go ? subPath(go, qs) : `/a/${a.id}${qs ? "?" + qs : ""}`);
+    } catch (e) {
+      toast((e as Error).message, { tone: "error" });
+    }
+  };
 
   const bar = (
     <AppBar
@@ -435,6 +447,7 @@ export function GraderScreen({ sid }: { sid: string }) {
           </View>
           <Button label="Previous" title="Previous submission ( [ )" disabled={!data.nav.prev} onPress={() => navigate(subPath(data.nav.prev!, qs))} />
           <Button label="Next" title="Next submission ( ] )" disabled={!data.nav.next} onPress={() => navigate(subPath(data.nav.next!, qs))} />
+          <Button label="Delete file" variant="danger" title="Delete this uploaded file and its results" onPress={deleteFile} />
           <Button label="Open PDF" onPress={() => window.open(`/s/${sid}/pdf`, "_blank", "noopener")} />
         </>
       }

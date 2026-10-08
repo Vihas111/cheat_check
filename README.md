@@ -54,6 +54,13 @@ Useful extras:
   one matches (same picture, cropped copy, shared wording) and a link to compare any pair side by side.
 - **Dashboard list:** it shows "Showing N of M" while a search or filter is on. Submissions, assignments and
   comparison buttons are real links, so right-click, middle-click or Ctrl/Cmd-click opens them in a new tab.
+- **Delete one uploaded file:** the red "Delete" at the end of a student's row on the dashboard, or "Delete file" in
+  the grader. It removes that file with its marks, grade and integrity results, and its stored copy. The rest of the
+  assignment is re-scanned without it. A copy in `data/inbox/` is removed too, so it does not come back on restart.
+- **Release all drafts:** the "Release N drafts" button on the dashboard (or More, "Release all drafts…") releases every
+  draft grade at once. It follows the same rules as releasing one by one: a draft with missing marks, one still being
+  checked, or a flagged one that is waiting for your integrity decision is skipped, and you are told how many and why.
+  "Show them" lists the skipped drafts.
 - **Delete one assignment:** the X on the assignment list, or More, "Delete this assignment". It removes that
   assignment's submissions, grades, decisions and stored files, and nothing else. Settings, the roster and other
   assignments stay. "Erase all data" in Settings is the only way to wipe everything.
