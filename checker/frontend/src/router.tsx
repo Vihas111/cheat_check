@@ -13,6 +13,7 @@ const ROUTES: [RegExp, string, string[]][] = [
   [/^\/a\/(\d+)\/calibrate$/, "calibrate", ["aid"]],
   [/^\/s\/(\d+)$/, "submission", ["sid"]],
   [/^\/m\/(\d+)$/, "compare", ["mid"]],
+  [/^\/i\/(\d+)$/, "item", ["iid"]],
 ];
 
 export type Route = { name: string; params: Record<string, string>; path: string; query: URLSearchParams };

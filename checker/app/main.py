@@ -60,7 +60,7 @@ app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 # The React front end (checker/frontend, built with `npm run build` into static/spa) takes over the page URLs when
 # it has been built; ?legacy=1 still shows the server-rendered pages, which also remain when it has not.
 SPA = HERE / "static" / "spa"
-PAGE_URL = re.compile(r"^/(?:new|settings|a/\d+(?:/(?:setup|clusters|calibrate))?|s/\d+|m/\d+)?$")
+PAGE_URL = re.compile(r"^/(?:new|settings|a/\d+(?:/(?:setup|clusters|calibrate))?|s/\d+|m/\d+|i/\d+)?$")
 if (SPA / "_expo").is_dir():
     app.mount("/_expo", StaticFiles(directory=SPA / "_expo"), name="spa-assets")
 
@@ -357,8 +357,10 @@ def status(aid: int):
         # changes whenever any score changes, so the page only refreshes when there is something new
         stamp = db.scalar(select(func.count()).select_from(Match).join(Submission, Submission.id == Match.submission_id)
                           .where(Submission.assignment_id == aid))
+    from checker.core import progress
     return JSONResponse({**c, "stamp": f"{c}-{stamp}",
-                         "rescanning": worker is not None and a.name in worker.busy_assignments})
+                         "rescanning": worker is not None and a.name in worker.busy_assignments,
+                         "rescan": progress.snapshot(a.name)})
 
 
 @app.post("/a/{aid}/upload")

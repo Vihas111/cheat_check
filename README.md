@@ -34,11 +34,16 @@ Useful extras:
 - **Reference sources:** model answers or known online solutions.
 - **Roster** (Settings): a CSV with `student_id,name,username,email`. With a roster, screenshots that show
   another student's name, ID, username or email are flagged.
+- **Everyone who shares an item:** click a screenshot or typed answer on a submission's integrity tab (or "See all
+  matches") to open it in a new tab. The page shows that item next to every other submission that has it, with why each
+  one matches (same picture, cropped copy, shared wording) and a link to compare any pair side by side.
 - **Dashboard list:** it shows "Showing N of M" while a search or filter is on. Submissions, assignments and
   comparison buttons are real links, so right-click, middle-click or Ctrl/Cmd-click opens them in a new tab.
 - **Delete one assignment:** the X on the assignment list, or More, "Delete this assignment". It removes that
   assignment's submissions, grades, decisions and stored files, and nothing else. Settings, the roster and other
   assignments stay. "Erase all data" in Settings is the only way to wipe everything.
+- **Re-scan progress:** while a re-scan runs, the dashboard shows the step (re-reading changed files, comparing,
+  scoring), how many submissions are done, the file it is on and a time estimate.
 - **Stopping and restarting:** unfinished files are queued in the database and continue on the next start. Keep using
   the same `data/` folder.
 - **Clusters:** groups of submissions that share distinctive content.
@@ -61,7 +66,8 @@ npm run build        # writes checker/app/static/spa, which the server picks up 
 npm run dev          # development: starts the Python server and Expo with hot reload, open http://localhost:8081
 ```
 
-The built UI is not committed. After pulling changes to `checker/frontend`, run `npm run build` again.
+The built UI is committed in `checker/app/static/spa`, so you do not need Node to run the app. If you change anything in
+`checker/frontend`, run `npm run build` again and commit the result.
 Themes follow the PESUcoin design system (`src/theme`): light, dark, or system, from the icon in the top bar.
 
 ## Using a GPU

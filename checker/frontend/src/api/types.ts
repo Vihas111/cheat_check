@@ -38,6 +38,16 @@ export type Submission = {
 export type Panel = {
   item_id: number; lines: string[]; submission_id: number; filename: string; label: string; thumb: string | null; text_title: string; chunks: [string, boolean][];
 };
+export type ItemMatch = {
+  match_id: number; submission_id: number; filename: string; student: { student_id: string; name: string | null } | null;
+  item_id: number; page: number; label: string; thumb: string | null; kind: string; what: string; why: string; shared: string[]; lines: string[];
+};
+export type ItemPage = {
+  item: { id: number; page: number; label: string; thumb: string | null; lines: string[]; kinds: string[]; weight: number | null; df: number | null };
+  submission: { id: number; filename: string; student: { student_id: string; name: string | null } | null };
+  assignment: { id: number; name: string };
+  matches: ItemMatch[];
+};
 export type Compare = {
   id: number; kind: string; summary: string; assignment: { id: number; name: string }; siblings: number[];
   a: Panel; b: Panel; overlay: string | null;

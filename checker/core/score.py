@@ -217,10 +217,12 @@ def score_submission(db, sub: Submission, idx: Index, all_subs: list[Submission]
     return sub.report_json
 
 
-def score_many(db, assignment_id: int, sub_ids=None, idx: Index | None = None):
+def score_many(db, assignment_id: int, sub_ids=None, idx: Index | None = None, on_progress=None):
     idx = idx or build_index(db, assignment_id)
     all_subs = db.scalars(select(Submission).where(Submission.id.in_(idx.subs))).all()
     students = db.scalars(select(Student)).all()
-    for sub in all_subs:
-        if sub_ids is None or sub.id in sub_ids:
-            score_submission(db, sub, idx, all_subs, students)
+    todo = [s for s in all_subs if sub_ids is None or s.id in sub_ids]
+    for i, sub in enumerate(todo):
+        score_submission(db, sub, idx, all_subs, students)
+        if on_progress:
+            on_progress(i + 1, len(todo))

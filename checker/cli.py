@@ -37,7 +37,7 @@ def cmd_serve(args):
         eng = get_engine()
         dev = getattr(eng, "device", "cpu")
         print(f"OCR: {eng.name} on {'GPU (' + dev + ')' if dev != 'cpu' else 'CPU'}"
-              + ("" if dev != "cpu" else "  (no usable GPU found; see README, Using a GPU)"))
+              + ("  (no usable GPU found; see README, Using a GPU)" if dev == "cpu" and eng.name == "rapidocr" else ""))
     except Exception as e:
         print(f"OCR engine not ready: {e}")
     if not args.no_browser:
