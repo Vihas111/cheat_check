@@ -21,7 +21,9 @@ class Settings(BaseSettings):
 
     # identity
     filename_regex: str = r"^(?P<student_id>[A-Za-z0-9]+)_.*\.pdf$"
-    student_id_regex: str = r"\b[A-Za-z]{0,2}\d{6,10}\b"
+    student_id_regex: str = r"\b(?:PES\d[A-Za-z0-9]{8,12}|[A-Za-z]{0,2}\d{6,10})\b"
+    # SRN pattern used to name students from the filename or cover page (PES1UG25CS138, PES1202604133)
+    srn_regex: str = r"PES\d[A-Z0-9]{8,12}"
 
     # extraction
     render_dpi: int = 150
