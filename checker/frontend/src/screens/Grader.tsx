@@ -9,6 +9,7 @@ import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, useFeedback } from "../ui/chrome";
 import { IgnoreRegion, MaskedThumb } from "../ui/IgnoreRegion";
 import { IgnoreText } from "../ui/IgnoreText";
+import { useDismiss } from "../ui/useDismiss";
 import {
   Button, Card, Choices, Disclosure, Dot, Field, Icon, LinkText, Pill, Reveal, Segmented, T, Tappable, Tier, web,
 } from "../ui/primitives";
@@ -162,6 +163,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
   const qs = useFilterQs();
   const { toast, confirm } = useFeedback();
   const meta = useMeta();
+  const dismiss = useDismiss();
   const last = sub.reviews[0] && sub.reviews[0].status in meta.decision ? sub.reviews[0] : null;
   const [choice, setChoice] = useState(sub.verify === "decided" && last ? last.status : "");
   const [note, setNote] = useState("");
@@ -296,7 +298,10 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
                 {it.matches.slice(0, 5).map((m) => (
                   <View key={m.id}>
                     <LinkText v="footnote" onPress={() => navigate(`/m/${m.id}`)}>{m.filename}</LinkText>
-                    <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>{m.what}</T>
+                    <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center", flexWrap: "wrap" }}>
+                      <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>{m.what}</T>
+                      <LinkText v="caption" onPress={() => dismiss(m.id, reload)} style={{ color: c.negative }}>Not a match</LinkText>
+                    </View>
                   </View>
                 ))}
                 {it.matches.length > 5 ? <T v="caption" c="inkTertiary">{it.matches.length - 5} more</T> : null}

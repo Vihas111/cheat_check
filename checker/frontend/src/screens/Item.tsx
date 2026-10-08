@@ -7,6 +7,7 @@ import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page, useFeedback } from "../ui/chrome";
 import { IgnoreRegion, MaskedThumb } from "../ui/IgnoreRegion";
 import { IgnoreText } from "../ui/IgnoreText";
+import { useDismiss } from "../ui/useDismiss";
 import { Button, Card, Pill, Reveal, T, web } from "../ui/primitives";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -36,9 +37,10 @@ function FileLink({ id, name, sub }: { id: number; name: string; sub?: string })
   );
 }
 
-function MatchCard({ m }: { m: ItemMatch }) {
+function MatchCard({ m, onChanged }: { m: ItemMatch; onChanged: () => void }) {
   const c = useColors();
   const { navigate } = useRouter();
+  const dismiss = useDismiss();
   return (
     <Card style={{ flexGrow: 1, flexBasis: 280, maxWidth: "100%", gap: spacing.sm }} pad={spacing.md}>
       <FileLink id={m.submission_id} name={m.filename} sub={[m.student?.name, m.student?.student_id].filter(Boolean).join(" · ") || undefined} />
@@ -54,7 +56,8 @@ function MatchCard({ m }: { m: ItemMatch }) {
           {m.shared.map((s, i) => <T key={i} v="mono" style={{ backgroundColor: c.accentSoft, padding: 6, borderRadius: radii.xs, fontSize: 11 } as never}>{s}</T>)}
         </View>
       ) : null}
-      <View style={{ flexDirection: "row" }}>
+      <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>
+        <Button small variant="danger" label="Not a match" title="These two are not really the same. Stop counting this pair." onPress={() => dismiss(m.match_id, onChanged)} />
         <a href={`/m/${m.match_id}`} onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); navigate(`/m/${m.match_id}`); } }} style={{ textDecoration: "none" }}>
           <Button small label="Compare side by side" onPress={() => navigate(`/m/${m.match_id}`)} />
         </a>
@@ -118,7 +121,7 @@ export function ItemScreen({ iid }: { iid: string }) {
               </View>
             ) : null}
           </Card>
-          {matches.map((m) => <MatchCard key={m.match_id} m={m} />)}
+          {matches.map((m) => <MatchCard key={m.match_id} m={m} onChanged={reload} />)}
         </View>
       </Reveal>
     </Page>
