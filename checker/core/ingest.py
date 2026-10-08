@@ -45,7 +45,14 @@ def load_roster(session, csv_path: Path) -> int:
     return n
 
 
+def find_srns(text: str) -> list[str]:
+    return [m.upper() for m in re.findall(get_settings().srn_regex, text or "", re.I)]
+
+
 def student_id_from_filename(filename: str) -> str:
+    srns = find_srns(filename)
+    if srns:
+        return srns[0]
     m = re.match(get_settings().filename_regex, filename)
     if m and m.groupdict().get("student_id"):
         return m.group("student_id")
@@ -161,6 +168,7 @@ def process(submission_id: int, ocr=None) -> dict:
         sub.pdf_meta_json = {**ex.meta, "skipped_images": ex.skipped_images,
                              "pages": [{"page": p.number, "path": p.path, "hidden_spans": p.hidden_spans}
                                        for p in ex.pages]}
+        _identify_from_cover(db, sub, built)
         for item, _ in built:
             item.submission_id = sub.id
             db.add(item)
@@ -175,6 +183,23 @@ def process(submission_id: int, ocr=None) -> dict:
             db.execute(Shingle.__table__.insert(), rows)
         sub.pipeline_version = PIPELINE_VERSION
     return summarize(ex, built)
+
+
+def _identify_from_cover(db, sub: Submission, built) -> None:
+    """Filenames are messy. If the filename has no SRN, use the one written on the first pages."""
+    if sub.is_reference or find_srns(sub.filename):
+        return
+    cover = " ".join(i.ocr_text or "" for i, _ in built if i.page <= 2)
+    srns = find_srns(cover)
+    if not srns:
+        return
+    srn = max(set(srns), key=srns.count)
+    st = db.scalar(select(Student).where(Student.student_id == srn))
+    if not st:
+        st = Student(student_id=srn)
+        db.add(st)
+        db.flush()
+    sub.student_pk = st.id
 
 
 def summarize(ex: ExtractedSubmission, built) -> dict:
