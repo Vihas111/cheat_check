@@ -13,10 +13,22 @@ def _gray(path) -> np.ndarray:
     return np.asarray(im)
 
 
-def _orb(a: np.ndarray, b: np.ndarray, ratio=0.75):
+def _keep_mask(img: np.ndarray, boxes) -> np.ndarray | None:
+    """Feature detection mask: 0 inside ignored regions (a little widened), 255 elsewhere."""
+    if not boxes:
+        return None
+    h, w = img.shape
+    m = np.full((h, w), 255, np.uint8)
+    pad = 12
+    for x0, y0, x1, y1 in boxes:
+        m[max(int(y0 * h) - pad, 0):int(y1 * h) + pad, max(int(x0 * w) - pad, 0):int(x1 * w) + pad] = 0
+    return m
+
+
+def _orb(a: np.ndarray, b: np.ndarray, ratio=0.75, masks_a=None, masks_b=None):
     orb = cv2.ORB_create(nfeatures=1500)
-    ka, da = orb.detectAndCompute(a, None)
-    kb, db = orb.detectAndCompute(b, None)
+    ka, da = orb.detectAndCompute(a, _keep_mask(a, masks_a))
+    kb, db = orb.detectAndCompute(b, _keep_mask(b, masks_b))
     if da is None or db is None or len(ka) < 8 or len(kb) < 8:
         return ka, kb, [], None
     pairs = cv2.BFMatcher(cv2.NORM_HAMMING).knnMatch(da, db, k=2)
@@ -31,19 +43,20 @@ def _orb(a: np.ndarray, b: np.ndarray, ratio=0.75):
     return ka, kb, [m for m, ok in zip(good, mask.ravel(), strict=True) if ok], H
 
 
-def orb_verify(path_a, path_b) -> dict:
-    """ORB + ratio test + RANSAC homography. -> {inliers, scale, shift} (transform is a -> b)."""
-    _, _, inliers, H = _orb(_gray(path_a), _gray(path_b))
+def orb_verify(path_a, path_b, masks_a=None, masks_b=None) -> dict:
+    """ORB + ratio test + RANSAC homography. -> {inliers, scale, shift} (transform is a -> b).
+    masks_* are ignored regions ([x0, y0, x1, y1] fractions) that features must not come from."""
+    _, _, inliers, H = _orb(_gray(path_a), _gray(path_b), masks_a=masks_a, masks_b=masks_b)
     if H is None:
         return {"inliers": 0}
     scale = float(np.sqrt(abs(np.linalg.det(H[:2, :2]))))
     return {"inliers": len(inliers), "scale": round(scale, 3), "shift": [round(float(H[0, 2])), round(float(H[1, 2]))]}
 
 
-def orb_overlay_png(path_a, path_b) -> bytes:
+def orb_overlay_png(path_a, path_b, masks_a=None, masks_b=None) -> bytes:
     """Side-by-side image with inlier matches drawn, for the comparison viewer."""
     a, b = _gray(path_a), _gray(path_b)
-    ka, kb, inliers, _ = _orb(a, b)
+    ka, kb, inliers, _ = _orb(a, b, masks_a=masks_a, masks_b=masks_b)
     out = cv2.drawMatches(a, ka, b, kb, inliers[:200], None, matchColor=(0, 200, 0),
                           flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
     return cv2.imencode(".png", out)[1].tobytes()

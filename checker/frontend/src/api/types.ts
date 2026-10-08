@@ -21,7 +21,7 @@ export type Meta = {
 };
 export type Source = { submission_id: number; filename: string; share: number; items: number; is_reference?: boolean };
 export type Item = {
-  id: number; page: number; label: string; weight: number | null; df: number | null; thumb: string | null; text: string; lines: string[];
+  id: number; page: number; label: string; weight: number | null; df: number | null; thumb: string | null; text: string; lines: string[]; masks: number[][];
   matched: boolean; matches: { id: number; filename: string; submission_id: number; what: string }[];
 };
 export type Submission = {
@@ -36,14 +36,14 @@ export type Submission = {
   items: Item[]; meta: { heads: string[]; rows: string[][] };
 };
 export type Panel = {
-  item_id: number; lines: string[]; submission_id: number; filename: string; label: string; thumb: string | null; text_title: string; chunks: [string, boolean][];
+  item_id: number; lines: string[]; masks: number[][]; submission_id: number; filename: string; label: string; thumb: string | null; text_title: string; chunks: [string, boolean][];
 };
 export type ItemMatch = {
   match_id: number; submission_id: number; filename: string; student: { student_id: string; name: string | null } | null;
-  item_id: number; page: number; label: string; thumb: string | null; kind: string; what: string; why: string; shared: string[]; lines: string[];
+  item_id: number; page: number; label: string; thumb: string | null; kind: string; what: string; why: string; shared: string[]; lines: string[]; masks: number[][];
 };
 export type ItemPage = {
-  item: { id: number; page: number; label: string; thumb: string | null; lines: string[]; kinds: string[]; weight: number | null; df: number | null };
+  item: { id: number; page: number; label: string; thumb: string | null; lines: string[]; masks: number[][]; kinds: string[]; weight: number | null; df: number | null };
   submission: { id: number; filename: string; student: { student_id: string; name: string | null } | null };
   assignment: { id: number; name: string };
   matches: ItemMatch[];

@@ -27,6 +27,11 @@ Useful extras:
 
 - **Boilerplate:** upload the assignment brief or starter code on the dashboard ("Assignment setup").
   Or click "Ignore everywhere" on a matched item. That content is then ignored for everyone.
+- **Ignore part of an image:** on an image item (the item page, the integrity tab or a comparison page) use "Ignore part
+  of the image…" and drag a box over the part, for example a question header or a tool bar, then confirm. The app finds
+  that same part in every image of the assignment, even at another size, blanks it out before images are compared and
+  drops the text read from it. Matches that depended only on that part disappear after the automatic re-scan, and the
+  rest of each image still counts. Ignored parts show as grey dashed boxes. Undo under Settings, "Ignored content".
 - **Ignore only the question:** when a flagged item holds a question and an answer, use "Ignore part of the text"
   (on the submission's integrity tab, or under the text on a comparison page). Tick the question lines and confirm.
   Only those lines are ignored, in that assignment. The answer still counts. Undo it under Settings, "Ignored content".

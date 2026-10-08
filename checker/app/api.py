@@ -285,7 +285,7 @@ def submission(sid: int, tier: str = "", status: str = "", q: str = "", grade: s
                      "status": mark.status, "updated_at": iso(mark.updated_at)} if mark else None,
             "items": [{"id": it.id, "page": it.page, "label": M._item_label(it), "weight": weights.get(str(it.id)),
                        "df": dfs.get(str(it.id)), "thumb": img(it.thumb_path), "text": (it.ocr_text or "")[:600],
-                       "lines": M.item_lines(it)[:120],
+                       "lines": M.item_lines(it)[:120], "masks": it.masks_json or [],
                        "matched": bool(by_item.get(it.id) and weights.get(str(it.id))),
                        "matches": [{"id": m.id, "filename": others[m.other_submission_id].filename,
                                     "submission_id": m.other_submission_id, "what": match_text(m)}
@@ -335,6 +335,23 @@ def review(sid: int, body: ReviewBody):
     return {"ok": True}
 
 
+class IgnoreRegion(BaseModel):
+    box: list[float]
+
+
+@router.post("/item/{iid}/ignore-region")
+def ignore_item_region(iid: int, body: IgnoreRegion):
+    from checker.core import regions
+    if len(body.box) != 4:
+        raise HTTPException(400, "Draw a box on the image first.")
+    name = regions.add_region(iid, body.box)
+    if name is None:
+        raise HTTPException(400, "That box is too small, or this item has no image.")
+    if M.worker:
+        M.worker.rescan_async(name)
+    return {"ok": True}
+
+
 class IgnoreText(BaseModel):
     lines: list[int]
 
@@ -372,7 +389,7 @@ def compare(mid: int):
         d = m.detail_json or {}
 
         def panel(it, s, h):
-            return {"item_id": it.id, "lines": M.item_lines(it)[:120],
+            return {"item_id": it.id, "lines": M.item_lines(it)[:120], "masks": it.masks_json or [],
                     "submission_id": s.id, "filename": s.filename, "label": M._item_label(it), "thumb": img(it.thumb_path),
                     "text_title": "Text read from the image" if it.thumb_path else "Typed text",
                     "chunks": [[c, hit] for c, hit in h] if it.norm_text else []}
@@ -403,9 +420,9 @@ def item_page(iid: int):
                         "student": student_json(os_.student), "item_id": o.id, "page": o.page,
                         "label": M._item_label(o), "thumb": img(o.thumb_path), "kind": m.kind,
                         "what": match_text(m), "why": compare_summary(m.kind, d).replace(" Shared passages are highlighted.", ""), "shared": shared,
-                        "lines": M.item_lines(o)[:6]})
+                        "lines": M.item_lines(o)[:6], "masks": o.masks_json or []})
         return {"item": {"id": it.id, "page": it.page, "label": M._item_label(it), "thumb": img(it.thumb_path),
-                         "lines": M.item_lines(it)[:120], "kinds": sorted({x["kind"] for x in out}),
+                         "lines": M.item_lines(it)[:120], "masks": it.masks_json or [], "kinds": sorted({x["kind"] for x in out}),
                          "weight": (report.get("item_weights") or {}).get(str(iid)),
                          "df": (report.get("item_df") or {}).get(str(iid))},
                 "submission": {"id": sub.id, "filename": sub.filename, "student": student_json(sub.student)},

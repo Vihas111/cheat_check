@@ -81,13 +81,13 @@ export function SettingsScreen() {
             {data.ignored.length ? data.ignored.map((w, i) => (
               <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, borderTopWidth: 1, borderTopColor: c.hairline, paddingTop: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <T v="footnote" style={{ fontWeight: "600" }}>{w.kind === "image" ? "images" : "text"} · {w.scope || "all assignments"} · {w.pieces} pieces</T>
+                  <T v="footnote" style={{ fontWeight: "600" }}>{w.kind === "image" ? "images" : w.kind === "region" ? "image part" : "text"} · {w.scope || "all assignments"} · {w.pieces} pieces</T>
                   <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>{w.reason}</T>
                 </View>
                 <Button small label="Stop ignoring" onPress={() => attempt("wl" + i, async () => {
                   await api.post("/settings/whitelist/delete", { kind: w.kind, scope: w.scope ?? "", reason: w.reason ?? "" });
                   reload();
-                  return "Removed. Re-scan the assignment to apply.";
+                  return "Removed. The assignment is being re-scanned.";
                 })} />
               </View>
             )) : <T v="footnote" c="inkSecondary">Nothing is ignored yet. Upload the brief on an assignment's setup panel, or use "Ignore everywhere" on a matched item.</T>}

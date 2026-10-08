@@ -197,14 +197,14 @@ def match_submission(db, sub: Submission, idx: Index, max_other_id: int | None =
             if kind == "image_hash":
                 score = 1 - h["distance"] / s.phash_size ** 2
                 if h["distance"] > s.phash_exact and h["variant"] == "orig" and it.thumb_path and o.thumb_path:
-                    detail.update(orb_verify(_abs(it.thumb_path), _abs(o.thumb_path)))
+                    detail.update(orb_verify(_abs(it.thumb_path), _abs(o.thumb_path), it.masks_json, o.masks_json))
                     if detail["inliers"] < s.orb_min_inliers and not any(
                             x["other_item"] == o.id and x["kind"] != "image_hash" for x in hits):
                         continue  # hash collision without feature or text support
             elif it.kind in IMAGE_KINDS and o.kind in IMAGE_KINDS and o.id not in img_pairs \
                     and it.thumb_path and o.thumb_path:
                 # text match between two images the hashes missed (crop, pad, ...): try features
-                orb = orb_verify(_abs(it.thumb_path), _abs(o.thumb_path))
+                orb = orb_verify(_abs(it.thumb_path), _abs(o.thumb_path), it.masks_json, o.masks_json)
                 if orb["inliers"] >= s.orb_min_inliers:
                     img_pairs.add(o.id)
                     rows.append((it.id, h["other_sub"], o.id, "image_feature", 1.0, orb))

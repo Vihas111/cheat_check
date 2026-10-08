@@ -5,6 +5,7 @@ import type { ItemMatch, ItemPage } from "../api/types";
 import { useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page, useFeedback } from "../ui/chrome";
+import { IgnoreRegion, MaskedThumb } from "../ui/IgnoreRegion";
 import { IgnoreText } from "../ui/IgnoreText";
 import { Button, Card, Pill, Reveal, T, web } from "../ui/primitives";
 
@@ -17,9 +18,9 @@ const KIND_WHY: Record<string, string> = {
   code_structure: "The code has the same structure once variable names and spacing are ignored.",
 };
 
-function Preview({ thumb, lines, label }: { thumb: string | null; lines: string[]; label: string }) {
+function Preview({ thumb, lines, label, masks }: { thumb: string | null; lines: string[]; label: string; masks?: number[][] }) {
   const c = useColors();
-  if (thumb) return <a href={thumb} target="_blank" rel="noreferrer"><img src={thumb} alt={label} loading="lazy" style={{ maxWidth: "100%", maxHeight: 220, display: "block", margin: "0 auto", borderRadius: 4, border: `1px solid ${c.hairline}` }} /></a>;
+  if (thumb) return <a href={thumb} target="_blank" rel="noreferrer"><MaskedThumb src={thumb} alt={label} masks={masks} style={{ maxHeight: 220, margin: "0 auto", borderRadius: 4, border: `1px solid ${c.hairline}` }} /></a>;
   return <T v="mono" style={{ backgroundColor: c.surfaceAlt, padding: 8, borderRadius: radii.xs, fontSize: 11 } as never}>{lines.join("\n")}</T>;
 }
 
@@ -45,7 +46,7 @@ function MatchCard({ m }: { m: ItemMatch }) {
         <Pill label={m.what} tone="warning" />
         <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>{cap(m.label)}</T>
       </View>
-      <Preview thumb={m.thumb} lines={m.lines} label={m.label} />
+      <Preview thumb={m.thumb} lines={m.lines} label={m.label} masks={m.masks} />
       <T v="footnote">{m.why}</T>
       {m.shared.length ? (
         <View style={{ gap: 4 }}>
@@ -108,11 +109,12 @@ export function ItemScreen({ iid }: { iid: string }) {
           <Card style={{ flexGrow: 1, flexBasis: 280, maxWidth: "100%", gap: spacing.sm, borderColor: c.warningBorder }} pad={spacing.md}>
             <T v="overline" c="accent">This item</T>
             <FileLink id={submission.id} name={submission.filename} sub={[submission.student?.name, submission.student?.student_id].filter(Boolean).join(" · ") || undefined} />
-            <Preview thumb={item.thumb} lines={item.lines.slice(0, 12)} label={item.label} />
+            <Preview thumb={item.thumb} lines={item.lines.slice(0, 12)} label={item.label} masks={item.masks} />
             {matches.length ? (
               <View style={{ gap: 2 }}>
                 <T v="caption" c="anchor" onPress={ignore} style={web({ cursor: "pointer" })}>Ignore everywhere, it is given material</T>
                 <IgnoreText itemId={item.id} lines={item.lines} assignment={assignment.name} onDone={() => navigate(`/s/${submission.id}?tab=integrity`)} />
+                <IgnoreRegion itemId={item.id} thumb={item.thumb} masks={item.masks} assignment={assignment.name} onDone={() => navigate(`/s/${submission.id}?tab=integrity`)} />
               </View>
             ) : null}
           </Card>

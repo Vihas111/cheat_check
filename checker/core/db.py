@@ -102,6 +102,8 @@ class Item(Base):
     ocr_conf: Mapped[float | None] = mapped_column(Float)
     ocr_words_json: Mapped[list | None] = mapped_column(JSON)
     thumb_path: Mapped[str | None] = mapped_column(String)
+    # ignored regions found in this image, as [x0, y0, x1, y1] fractions of its width and height
+    masks_json: Mapped[list | None] = mapped_column(JSON(none_as_null=True))
 
     submission: Mapped[Submission] = relationship(back_populates="items")
 
@@ -218,7 +220,7 @@ def init_db(url: str | None = None):
 
     Base.metadata.create_all(_engine)
     with _engine.begin() as conn:  # ponytail: hand migration for added columns; Alembic if more follow
-        for table, col in (("reviews", "suggestion_json"), ("assignments", "rubric_json")):
+        for table, col in (("reviews", "suggestion_json"), ("assignments", "rubric_json"), ("items", "masks_json")):
             if col not in [r[1] for r in conn.exec_driver_sql(f"PRAGMA table_info({table})")]:
                 conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} JSON")
     _Session = sessionmaker(_engine, expire_on_commit=False)

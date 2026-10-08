@@ -656,10 +656,10 @@ def overlay(mid: int):
     with session_scope() as db:
         m = db.get(Match, mid)
         a, b = db.get(Item, m.item_id), db.get(Item, m.other_item_id)
-        pa, pb = a.thumb_path, b.thumb_path
+        pa, pb, ma, mb = a.thumb_path, b.thumb_path, a.masks_json, b.masks_json
     if not (pa and pb):
         raise HTTPException(404)
-    return Response(verify.orb_overlay_png(d / pa, d / pb), media_type="image/png")
+    return Response(verify.orb_overlay_png(d / pa, d / pb, ma, mb), media_type="image/png")
 
 
 # ---------------- clusters / calibration / export ----------------
@@ -896,9 +896,15 @@ def whitelist_delete(kind: str = Form(...), reason: str = Form(""), scope: str =
     with session_scope() as db:
         q = select(Whitelist).where(Whitelist.kind == kind, Whitelist.reason == (reason or None),
                                     Whitelist.scope == scope if scope else Whitelist.scope.is_(None))
-        for w in db.scalars(q):
+        found = db.scalars(q).all()
+        if kind == "region":
+            from checker.core import regions
+            regions.delete_files(found)
+        for w in found:
             db.delete(w)
-    return RedirectResponse("/settings?msg=Removed.+Re-scan+the+assignment+to+apply.", 303)
+    if scope and worker:  # take the rule out of the comparison right away
+        worker.rescan_async(scope)
+    return RedirectResponse("/settings?msg=Removed.+Re-scanning+the+assignment.", 303)
 
 
 from checker.app import api  # noqa: E402  (JSON API for the React front end; needs the helpers above)
