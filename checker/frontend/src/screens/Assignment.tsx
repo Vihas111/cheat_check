@@ -4,7 +4,7 @@ import { TextInput, View, useWindowDimensions } from "react-native";
 import { api, isBusy, useGet, useInterval, type RescanProgress, type Status } from "../api/client";
 import type { Dashboard, Row } from "../api/types";
 import { fmt, GRADE_LABEL, pct, useMeta, when } from "../meta";
-import { useQuery, useRouter } from "../router";
+import { subPath, useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page, useFeedback, useWindowDrop } from "../ui/chrome";
 import {
@@ -63,7 +63,7 @@ function GradePill({ row }: { row: Row }) {
   return <Pill label={(s === "released" ? "✓ " : "") + GRADE_LABEL[s]} tone={s === "released" ? "positive" : s === "draft" ? "anchor" : "neutral"} />;
 }
 
-function SubRow({ row, max, wide, index }: { row: Row; max: number; wide: boolean; index: number }) {
+function SubRow({ row, max, wide, index, qs }: { row: Row; max: number; wide: boolean; index: number; qs: string }) {
   const c = useColors();
   const { navigate } = useRouter();
   const meta = useMeta();
@@ -71,7 +71,7 @@ function SubRow({ row, max, wide, index }: { row: Row; max: number; wide: boolea
   const sub = row.student?.name ? row.filename : row.student?.student_id ?? "";
   return (
     <Reveal delay={Math.min(index, 12) * 30} y={6}>
-      <Tappable href={`/s/${row.id}`} onPress={() => navigate(`/s/${row.id}`)} label={name} style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
+      <Tappable href={subPath(row.id, qs)} onPress={() => navigate(subPath(row.id, qs))} label={name} style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 12, minHeight: 60 }}>
           <View style={{ flex: 2.2, minWidth: 0 }}>
             <T v="bodyStrong" numberOfLines={1}>{name}</T>
@@ -257,7 +257,7 @@ export function AssignmentScreen({ aid }: { aid: string }) {
             <Select label="Grade status" width={150} value={grade} onChange={(v) => setQuery({ grade: v })}
               options={[{ value: "", label: "All grades" }, { value: "none", label: "Not graded" }, { value: "draft", label: "Draft" }, { value: "released", label: "Released" }]} />
             <Select label="Integrity" width={230} value={status} onChange={(v) => setQuery({ status: v })}
-              options={[{ value: "", label: "Any integrity state" }, { value: "awaiting", label: "Awaiting your decision" }, { value: "decided", label: "Decided" },
+              options={[{ value: "", label: "Any integrity state" }, { value: "awaiting", label: "Awaiting your decision" }, { value: "clear", label: "Nothing flagged" }, { value: "decided", label: "Decided" },
                 ...Object.entries(meta.decision).map(([k, v]) => ({ value: k, label: `Decided: ${v.toLowerCase()}` }))]} />
             <Select label="Similarity" width={180} value={tier} onChange={(v) => setQuery({ tier: v })}
               options={[{ value: "", label: "Any similarity" }, ...Object.entries(meta.tier).map(([k, v]) => ({ value: k, label: v }))]} />
@@ -275,11 +275,11 @@ export function AssignmentScreen({ aid }: { aid: string }) {
                 <T v="footnote" c="inkSecondary" style={{ flex: 1.5 }}>Integrity</T>
                 {wide ? <T v="footnote" c="inkSecondary" style={{ flex: 2 }}>Similarity</T> : null}
               </View>
-              {d.rows.map((r, i) => <SubRow key={r.id} row={r} max={a.max_score} wide={wide} index={i} />)}
+              {d.rows.map((r, i) => <SubRow key={r.id} row={r} max={a.max_score} wide={wide} index={i} qs={new URLSearchParams(Object.entries({ grade, status, tier, q }).filter(([, v]) => v)).toString()} />)}
             </View>
           ) : (
             <View style={{ borderTopWidth: 1, borderTopColor: c.hairline }}>
-              <Empty>{status === "awaiting" ? "Nothing is waiting for your integrity decision." : filtered ? "No submissions match these filters." : "No submissions yet. Drop PDFs here or use Add PDFs."}</Empty>
+              <Empty>{status === "awaiting" ? "Nothing is waiting for your integrity decision." : status === "clear" && !grade && !tier && !q ? "Every submission has something flagged." : filtered ? "No submissions match these filters." : "No submissions yet. Drop PDFs here or use Add PDFs."}</Empty>
             </View>
           )}
         </Card>

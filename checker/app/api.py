@@ -219,7 +219,7 @@ def match_text(m: Match) -> str:
 
 
 @router.get("/s/{sid}")
-def submission(sid: int):
+def submission(sid: int, tier: str = "", status: str = "", q: str = "", grade: str = ""):
     with session_scope() as db:
         sub = db.get(Submission, sid)
         if not sub:
@@ -243,20 +243,36 @@ def submission(sid: int):
                      for k in ["producer", "creator", "author", "creationDate", "modDate"]]
         job = db.scalar(select(Job).where(Job.submission_id == sid))
         verify = M.verification(sub, flags, reviews[0] if reviews else None) if sub.status == "done" else None
-        queue = [r["sub"].id for r in M.dashboard_rows(db, sub.assignment_id, status="awaiting") if r["sub"].id != sid]
-        roster = [r for r in M.dashboard_rows(db, sub.assignment_id) if r["gradable"]]
+        # Previous/next follow the list as filtered on the dashboard (same tier, status, search and grade filters).
+        filtered = bool(tier or status or q or grade)
+        queue = [r["sub"].id for r in M.dashboard_rows(db, sub.assignment_id, tier, "awaiting", q, grade)
+                 if r["sub"].id != sid]
+        everyone = [r for r in M.dashboard_rows(db, sub.assignment_id) if r["gradable"]]
+        roster = [r for r in M.dashboard_rows(db, sub.assignment_id, tier, status, q, grade) if r["gradable"]] \
+            if filtered else everyone
         ids = [r["sub"].id for r in roster]
-        pos = ids.index(sid) if sid in ids else -1
-        after = roster[pos + 1:] + roster[:max(pos, 0)]
-        ungraded = [r["sub"].id for r in after if not (r["mark"] and r["mark"].status == "released")]
+        marks_by_id = {r["sub"].id: r["mark"] for r in everyone}
+        if sid in ids:
+            pos = ids.index(sid)
+            prev_id, next_id = (ids[pos - 1] if pos > 0 else None), (ids[pos + 1] if pos < len(ids) - 1 else None)
+            after = ids[pos + 1:] + ids[:pos]
+        else:  # this one just left the filter (for example it was graded): carry on from where it sat in the full list
+            pos = -1
+            all_ids = [r["sub"].id for r in everyone]
+            i = all_ids.index(sid) if sid in all_ids else 0
+            keep = set(ids)
+            later = [x for x in all_ids[i + 1:] if x in keep]
+            earlier = [x for x in all_ids[:i] if x in keep]
+            prev_id, next_id = (earlier[-1] if earlier else None), (later[0] if later else None)
+            after = later + earlier
+        ungraded = [x for x in after if not (marks_by_id.get(x) and marks_by_id[x].status == "released")]
         mark = db.get(Mark, sid)
         return {
             "id": sub.id, "filename": sub.filename, "page_count": sub.page_count, "status": sub.status,
             "is_seed": sub.is_seed, "is_reference": sub.is_reference, "error": (job.error or "")[:300] if job else "",
             "assignment": {"id": a.id, "name": a.name, "max_score": a.max_score, "rubric": M.rubric(a)},
             "student": student_json(sub.student), "verify": verify,
-            "nav": {"pos": pos, "count": len(ids), "prev": ids[pos - 1] if pos > 0 else None,
-                    "next": ids[pos + 1] if 0 <= pos < len(ids) - 1 else None,
+            "nav": {"pos": pos, "count": len(ids), "prev": prev_id, "next": next_id, "filtered": filtered,
                     "next_ungraded": ungraded[0] if ungraded else None, "next_flagged": queue[0] if queue else None},
             "report": {"tier": report.get("tier"), "reasons": report.get("reasons", []),
                        "coverage": report.get("coverage"), "population": report.get("population"),

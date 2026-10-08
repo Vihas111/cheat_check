@@ -4,7 +4,7 @@ import { Image, View, useWindowDimensions } from "react-native";
 import { api, useGet, useInterval } from "../api/client";
 import type { Item, Submission } from "../api/types";
 import { fmt, pct, useMeta, when } from "../meta";
-import { useQuery, useRouter } from "../router";
+import { subPath, useFilterQs, useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, useFeedback } from "../ui/chrome";
 import { IgnoreText } from "../ui/IgnoreText";
@@ -70,6 +70,7 @@ function GradeTab({ sub, reload, goIntegrity, marks, setMarks, feedback, setFeed
 }) {
   const c = useColors();
   const { navigate } = useRouter();
+  const qs = useFilterQs();
   const needsCheck = sub.verify === "awaiting" || sub.verify === "recheck";
   const filled = Object.values(marks).filter((v) => v.trim() !== "");
   const total = filled.length ? filled.reduce((s, v) => s + (parseFloat(v) || 0), 0) : null;
@@ -141,7 +142,7 @@ function GradeTab({ sub, reload, goIntegrity, marks, setMarks, feedback, setFeed
           <>
             <Button variant="primary" label="Release grade" disabled={needsCheck} title={needsCheck ? "Record your integrity decision first" : undefined} onPress={run("release")} loading={busy === "release"} />
             {sub.nav.next_ungraded ? (
-              <Button variant="primary" label="Release and next" disabled={needsCheck} onPress={run("release", () => navigate(`/s/${sub.nav.next_ungraded}`))} loading={busy === "next"} />
+              <Button variant="primary" label="Release and next" disabled={needsCheck} onPress={run("release", () => navigate(subPath(sub.nav.next_ungraded!, qs)))} loading={busy === "next"} />
             ) : null}
           </>
         )}
@@ -157,6 +158,7 @@ const SERIES = ["series", "series", "series", "series", "series"] as const;
 function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () => void; showPage: (p: number) => void }) {
   const c = useColors();
   const { navigate } = useRouter();
+  const qs = useFilterQs();
   const { toast, confirm } = useFeedback();
   const meta = useMeta();
   const last = sub.reviews[0] && sub.reviews[0].status in meta.decision ? sub.reviews[0] : null;
@@ -171,7 +173,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
     try {
       await api.post(`/s/${sub.id}/review`, { status, note });
       const next = sub.nav.next_flagged;
-      toast(status === "unreviewed" ? "Decision withdrawn. This submission is waiting again." : `Decision saved: ${meta.decision[status]}.`, next ? { action: { label: "Next flagged submission", onPress: () => navigate(`/s/${next}?tab=integrity`) } } : undefined);
+      toast(status === "unreviewed" ? "Decision withdrawn. This submission is waiting again." : `Decision saved: ${meta.decision[status]}.`, next ? { action: { label: "Next flagged submission", onPress: () => navigate(subPath(next, qs, "tab=integrity")) } } : undefined);
       setNote("");
       reload();
     } catch (e) {
@@ -338,7 +340,8 @@ export function GraderScreen({ sid }: { sid: string }) {
   const { toast } = useFeedback();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useQuery();
-  const { data, error, reload } = useGet<Submission>(`/s/${sid}`);
+  const qs = useFilterQs();
+  const { data, error, reload } = useGet<Submission>(`/s/${sid}${qs ? "?" + qs : ""}`);
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -375,15 +378,15 @@ export function GraderScreen({ sid }: { sid: string }) {
   }, [data, marks, feedback, toast, reload]);
 
   // Keyboard: [ and ] move between submissions, Ctrl+S saves a draft.
-  const keys = useRef({ save, data });
-  keys.current = { save, data };
+  const keys = useRef({ save, data, qs });
+  keys.current = { save, data, qs };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const d = keys.current.data;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); keys.current.save("save"); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || !d || /INPUT|TEXTAREA|SELECT/.test((document.activeElement as HTMLElement)?.tagName ?? "")) return;
-      if (e.key === "[" && d.nav.prev) navigate(`/s/${d.nav.prev}`);
-      if (e.key === "]" && d.nav.next) navigate(`/s/${d.nav.next}`);
+      if (e.key === "[" && d.nav.prev) navigate(subPath(d.nav.prev, keys.current.qs));
+      if (e.key === "]" && d.nav.next) navigate(subPath(d.nav.next, keys.current.qs));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -410,12 +413,13 @@ export function GraderScreen({ sid }: { sid: string }) {
   const bar = (
     <AppBar
       compact title={name} subtitle={subtitle}
-      crumbs={[{ label: "Assignments", to: "/" }, { label: a.name, to: `/a/${a.id}` }]}
+      crumbs={[{ label: "Assignments", to: "/" }, { label: a.name, to: `/a/${a.id}${qs ? "?" + qs : ""}` }]}
       actions={
         <>
-          {data.nav.pos >= 0 ? <T v="footnote" c="inkTertiary">{data.nav.pos + 1} of {data.nav.count}</T> : null}
-          <Button label="Previous" title="Previous submission ( [ )" disabled={!data.nav.prev} onPress={() => navigate(`/s/${data.nav.prev}`)} />
-          <Button label="Next" title="Next submission ( ] )" disabled={!data.nav.next} onPress={() => navigate(`/s/${data.nav.next}`)} />
+          {data.nav.filtered ? <Pill label="Filtered list" tone="anchor" /> : null}
+          {data.nav.pos >= 0 ? <T v="footnote" c="inkTertiary">{data.nav.pos + 1} of {data.nav.count}</T> : data.nav.filtered ? <T v="footnote" c="inkTertiary">{data.nav.count} in the filtered list</T> : null}
+          <Button label="Previous" title="Previous submission ( [ )" disabled={!data.nav.prev} onPress={() => navigate(subPath(data.nav.prev!, qs))} />
+          <Button label="Next" title="Next submission ( ] )" disabled={!data.nav.next} onPress={() => navigate(subPath(data.nav.next!, qs))} />
           <Button label="Open PDF" onPress={() => window.open(`/s/${sid}/pdf`, "_blank", "noopener")} />
         </>
       }

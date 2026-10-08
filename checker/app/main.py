@@ -300,6 +300,8 @@ def dashboard_rows(db, aid: int, tier: str = "", status: str = "", q: str = "", 
             continue
         if status == "awaiting" and row["verify"] not in ("awaiting", "recheck"):
             continue
+        if status == "clear" and row["verify"] != "not_needed":
+            continue
         if status in (*DECISIONS, "decided") and row["verify"] != "decided":
             continue
         if grade and (not row["gradable"] or (row["mark"].status if row["mark"] else "none") != grade):
