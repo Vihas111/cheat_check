@@ -5,6 +5,7 @@ import type { Compare, Panel } from "../api/types";
 import { useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page } from "../ui/chrome";
+import { IgnoreRegion, MaskedThumb } from "../ui/IgnoreRegion";
 import { IgnoreText } from "../ui/IgnoreText";
 import { Card, Disclosure, LinkText, Reveal, T, Tappable } from "../ui/primitives";
 
@@ -17,7 +18,8 @@ function PanelCard({ p, assignment }: { p: Panel; assignment: string }) {
     <Card style={{ flex: 1, minWidth: 300, gap: spacing.sm }}>
       <LinkText v="title3" onPress={() => navigate(`/s/${p.submission_id}`)}>{p.filename}</LinkText>
       <T v="footnote" c="inkSecondary">{cap(p.label)}</T>
-      {p.thumb ? <a href={p.thumb} target="_blank" rel="noreferrer"><img src={p.thumb} alt={`${p.label} of ${p.filename}`} style={{ maxWidth: "100%", borderRadius: 4, border: `1px solid ${c.hairline}`, display: "block" }} /></a> : null}
+      {p.thumb ? <a href={p.thumb} target="_blank" rel="noreferrer"><MaskedThumb src={p.thumb} alt={`${p.label} of ${p.filename}`} masks={p.masks} style={{ borderRadius: 4, border: `1px solid ${c.hairline}` }} /></a> : null}
+      {p.thumb ? <IgnoreRegion itemId={p.item_id} thumb={p.thumb} masks={p.masks} assignment={assignment} /> : null}
       {p.chunks.length ? (
         <>
           <T v="overline" c="accent" style={{ marginTop: spacing.sm }}>{p.text_title}</T>

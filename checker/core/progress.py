@@ -6,7 +6,7 @@ import time
 _lock = threading.Lock()
 _state: dict[str, dict] = {}
 
-STEPS = ["Re-reading changed files", "Comparing submissions", "Scoring results"]
+STEPS = ["Re-reading changed files", "Applying ignored regions", "Comparing submissions", "Scoring results"]
 
 
 def start(assignment: str) -> None:

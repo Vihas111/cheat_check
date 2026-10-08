@@ -12,6 +12,7 @@ from sqlalchemy import delete, select
 
 from checker.config import PIPELINE_VERSION, get_settings
 from checker.core import fingerprint as fp
+from checker.core import regions
 from checker.core.db import Assignment, Entity, Item, Job, Shingle, Student, Submission, Whitelist, session_scope
 from checker.core.entities import extract_entities
 from checker.core.normalize import normalize_text
@@ -242,6 +243,8 @@ def run_job(submission_id: int, ocr=None) -> dict:
         db.get(Submission, submission_id).status = "processing"
     try:
         summary = process(submission_id, ocr)
+        with session_scope() as db:  # ignored regions apply to new files too
+            regions.apply(db, db.get(Submission, submission_id).assignment_id, [submission_id])
         match_and_score(submission_id)
     except Exception as e:
         log.exception("job for submission %s failed", submission_id)
@@ -284,16 +287,19 @@ def rescan(assignment: str, ocr=None, reprocess_all=False) -> dict:
             process(sid, ocr)
             with session_scope() as db:
                 db.get(Submission, sid).status = "done"
-        with MATCH_LOCK, session_scope() as db:
+        with session_scope() as db:
             progress.update(assignment, 2, 0, 0)
+            regions.apply(db, a.id, progress=lambda d, t: progress.update(assignment, 2, d, t))
+        with MATCH_LOCK, session_scope() as db:
+            progress.update(assignment, 3, 0, 0)
             idx = build_index(db, a.id)
             ids = sorted(idx.subs)
             names = dict(db.execute(select(Submission.id, Submission.filename).where(Submission.id.in_(ids))).all())
             for i, sid in enumerate(ids):
-                progress.update(assignment, 2, i, len(ids), names.get(sid, ""))
+                progress.update(assignment, 3, i, len(ids), names.get(sid, ""))
                 match_submission(db, db.get(Submission, sid), idx, max_other_id=sid)
-            progress.update(assignment, 3, 0, len(ids))
-            score_many(db, a.id, None, idx, on_progress=lambda d, t: progress.update(assignment, 3, d, t))
+            progress.update(assignment, 4, 0, len(ids))
+            score_many(db, a.id, None, idx, on_progress=lambda d, t: progress.update(assignment, 4, d, t))
     finally:
         progress.finish(assignment)
     return {"assignment": assignment, "reprocessed": len(stale), "rescored": len(subs)}

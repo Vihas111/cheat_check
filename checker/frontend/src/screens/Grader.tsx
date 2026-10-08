@@ -7,6 +7,7 @@ import { fmt, GRADE_LABEL, pct, useMeta, when } from "../meta";
 import { subPath, useFilterQs, useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, useFeedback } from "../ui/chrome";
+import { IgnoreRegion, MaskedThumb } from "../ui/IgnoreRegion";
 import { IgnoreText } from "../ui/IgnoreText";
 import {
   Button, Card, Choices, Disclosure, Dot, Field, Icon, LinkText, Pill, Reveal, Segmented, T, Tappable, Tier, web,
@@ -285,7 +286,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
               <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>weight {it.weight == null ? "–" : it.weight.toFixed(2)}{it.df && it.df > 1 ? `, in ${it.df} files` : ""}</T>
             </View>
             {it.thumb ? (
-              <a href={`/i/${it.id}`} target="_blank" rel="noreferrer" title="Open this item and everyone who shares it in a new tab"><img src={it.thumb} alt={it.label} loading="lazy" style={{ maxWidth: "100%", maxHeight: 160, display: "block", margin: "0 auto", borderRadius: 4, cursor: "zoom-in" }} /></a>
+              <a href={`/i/${it.id}`} target="_blank" rel="noreferrer" title="Open this item and everyone who shares it in a new tab"><MaskedThumb src={it.thumb} alt={it.label} masks={it.masks} style={{ maxHeight: 160, margin: "0 auto", borderRadius: 4, cursor: "zoom-in" }} /></a>
             ) : (
               <a href={`/i/${it.id}`} target="_blank" rel="noreferrer" title="Open this item and everyone who shares it in a new tab" style={{ textDecoration: "none", color: "inherit" }}><T v="mono" style={{ backgroundColor: c.surfaceAlt, padding: 8, borderRadius: radii.xs, fontSize: 11, maxHeight: 128, overflow: "hidden" } as never}>{it.text}</T></a>
             )}
@@ -301,6 +302,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
                 {it.matches.length > 5 ? <T v="caption" c="inkTertiary">{it.matches.length - 5} more</T> : null}
                 <LinkText v="caption" onPress={() => ignore(it)} style={{ marginTop: 4 }}>Ignore everywhere, it is given material</LinkText>
                 <IgnoreText itemId={it.id} lines={it.lines} assignment={sub.assignment.name} onDone={reload} />
+                <IgnoreRegion itemId={it.id} thumb={it.thumb} masks={it.masks} assignment={sub.assignment.name} onDone={reload} />
               </View>
             ) : null}
           </View>
