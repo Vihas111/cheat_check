@@ -1,5 +1,6 @@
 """Pluggable OCR: OcrEngine.extract(image) -> {text, words:[{text, bbox, conf}]}."""
 
+import logging
 import shutil
 import threading
 from functools import lru_cache
@@ -9,6 +10,8 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from checker.config import get_settings
+
+log = logging.getLogger(__name__)
 
 
 class OcrEngine(Protocol):
@@ -52,12 +55,33 @@ def _result(words: list[dict]) -> dict:
     return {"text": lines_to_text(words), "words": words, "conf": conf}
 
 
+def pick_device(requested: str | None = None) -> str:
+    """cpu | cuda | directml, from the setting and what onnxruntime can actually use on this machine."""
+    import onnxruntime as ort
+    want = (requested or get_settings().ocr_device).lower()
+    have = set(ort.get_available_providers())
+    usable = {"cuda": "CUDAExecutionProvider" in have, "directml": "DmlExecutionProvider" in have}
+    if want in usable:
+        if usable[want]:
+            return want
+        log.warning("ocr_device=%s is not available here (onnxruntime providers: %s); using the CPU. "
+                    "See the README section on GPUs.", want, sorted(have))
+        return "cpu"
+    if want == "auto":
+        return next((d for d in ("cuda", "directml") if usable[d]), "cpu")
+    return "cpu"
+
+
 class RapidOcrEngine:
     name = "rapidocr"
 
     def __init__(self):
         from rapidocr_onnxruntime import RapidOCR
-        self._ocr = RapidOCR()
+        self.device = pick_device()
+        flags = {f"{m}_use_{'cuda' if self.device == 'cuda' else 'dml'}": True
+                 for m in ("det", "cls", "rec")} if self.device != "cpu" else {}
+        self._ocr = RapidOCR(**flags)
+        log.info("OCR running on %s", self.device)
         self._lock = threading.Lock()  # ponytail: one OCR at a time per process; onnxruntime is multi-threaded inside
 
     def extract(self, image: Image.Image) -> dict:

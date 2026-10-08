@@ -32,6 +32,11 @@ def cmd_serve(args):
     s = get_settings()
     url = f"http://{s.host}:{args.port or s.port}"
     print(f"Similarity checker running at {url}  (Ctrl+C to stop)")
+    try:
+        from checker.core.ocr import pick_device
+        print(f"OCR device: {pick_device()}  (change with the ocr_device setting)")
+    except ImportError:
+        pass
     if not args.no_browser:
         webbrowser.open(url)
     uvicorn.run("checker.app.main:app", host=s.host, port=args.port or s.port, log_level="warning")

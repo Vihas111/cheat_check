@@ -52,6 +52,25 @@ npm run dev          # development: starts the Python server and Expo with hot r
 
 Themes follow the PESUcoin design system (`src/theme`): light, dark, or system, from the icon in the top bar.
 
+## Using a GPU
+
+OCR is the slow step and the only one that can use a GPU. Image hashing and screenshot matching run on the CPU.
+The `ocr_device` setting (Settings, or `CHECKER_OCR_DEVICE`) is `auto` by default: it uses a GPU when onnxruntime can see one
+and the CPU otherwise. The server prints `OCR device: ...` at start-up.
+
+The default install ships the CPU build of onnxruntime. Swap it for the build that matches your GPU, then start with
+`--no-sync` so `uv` does not put the CPU build back:
+
+```bash
+# NVIDIA (needs a CUDA 12 + cuDNN 9 install that matches your driver)
+uv pip uninstall onnxruntime && uv pip install onnxruntime-gpu
+# Any GPU on Windows 10/11 (NVIDIA, AMD, Intel)
+uv pip uninstall onnxruntime && uv pip install onnxruntime-directml
+uv run --no-sync python -m checker.cli serve
+```
+
+If the GPU cannot be used, the app logs a warning and falls back to the CPU. Force a choice with `ocr_device` = `cpu`, `cuda` or `directml`.
+
 ## Command line
 
 ```bash

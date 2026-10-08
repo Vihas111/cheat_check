@@ -750,6 +750,7 @@ EDITABLE = {
     "filename_regex": "Regex extracting student_id from the PDF filename.",
     "student_id_regex": "Regex for student IDs found inside screenshots.",
     "ocr_engine": "auto, rapidocr or tesseract (all run locally).",
+    "ocr_device": "auto, cpu, cuda or directml. Needs the GPU build of onnxruntime; see the README. Restart to apply.",
     "render_dpi": "Page render resolution for scanned / vector pages.",
     "workers": "Parallel ingestion jobs (restart to apply).",
 }
