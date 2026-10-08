@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TextInput, View, useWindowDimensions } from "react-native";
 
-import { api, isBusy, useGet, useInterval, type Status } from "../api/client";
+import { api, isBusy, useGet, useInterval, type RescanProgress, type Status } from "../api/client";
 import type { Dashboard, Row } from "../api/types";
 import { fmt, GRADE_LABEL, pct, useMeta, when } from "../meta";
 import { useQuery, useRouter } from "../router";
@@ -25,6 +25,35 @@ function Stat({ label, value, of, note, warn, onPress, first }: { label: string;
         <T v="caption" c={warn ? "warning" : "inkTertiary"} style={{ fontWeight: "400", marginTop: of !== undefined ? 4 : 0 }}>{note}</T>
       </View>
     </Tappable>
+  );
+}
+
+function eta(sec: number | null) {
+  if (sec == null) return "";
+  return sec < 60 ? `about ${Math.max(5, Math.round(sec / 5) * 5)} s left` : `about ${Math.round(sec / 60)} min left`;
+}
+
+/** What a re-scan is doing right now: the step, how far it is, the file it is on and a time estimate. */
+function RescanStatus({ r }: { r?: RescanProgress | null }) {
+  if (!r) return (
+    <View style={{ gap: 4 }}>
+      <ProgressBar value={3} />
+      <T v="footnote" c="inkSecondary">Re-scanning: starting. Results will update when it finishes.</T>
+    </View>
+  );
+  const frac = r.total ? r.done / r.total : 0;
+  const overall = ((r.step - 1 + frac) / r.steps) * 100;
+  const counts = r.total ? `${r.done} of ${r.total}` : "preparing";
+  return (
+    <View style={{ gap: 4 }}>
+      <ProgressBar value={Math.max(overall, 3)} />
+      <T v="footnote" c="inkSecondary">
+        <T v="footnote" style={{ fontWeight: "700" }}>Re-scanning, step {r.step} of {r.steps}: {r.phase}</T>
+        {` · ${counts}${r.total ? ` (${Math.round(frac * 100)}%)` : ""}`}{r.eta_s != null ? ` · ${eta(r.eta_s)}` : ""}
+      </T>
+      {r.file ? <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }} numberOfLines={1}>Now: {r.file}</T> : null}
+      <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>It is safe to keep browsing. Flags and similarity update when this finishes.</T>
+    </View>
   );
 }
 
@@ -186,11 +215,12 @@ export function AssignmentScreen({ aid }: { aid: string }) {
           </View>
           {!total ? <T v="footnote" c="inkSecondary">Name files <T v="mono" style={{ backgroundColor: c.surfaceAlt }}>studentid_anything.pdf</T> to tie them to a student. You can change the student on each submission later.</T> : null}
           {uploader.lines.map((l, i) => <T key={i} v="footnote" c={i ? "negative" : "inkSecondary"}>{l}</T>)}
-          {total ? (
+          {s.rescanning ? <RescanStatus r={s.rescan} /> : null}
+          {total && !s.rescanning ? (
             <View style={{ gap: 4 }}>
               <ProgressBar value={((s.done + s.failed) / (total || 1)) * 100} />
               <T v="footnote" c="inkSecondary">
-                {s.done} read, {s.processing} in progress, {s.queued} waiting{s.failed ? <T v="footnote" c="negative" style={{ fontWeight: "700" }}>, {s.failed} could not be read</T> : null}{s.rescanning ? ". Re-scanning." : ""}
+                {s.done} read, {s.processing} in progress, {s.queued} waiting{s.failed ? <T v="footnote" c="negative" style={{ fontWeight: "700" }}>, {s.failed} could not be read</T> : null}
               </T>
             </View>
           ) : null}

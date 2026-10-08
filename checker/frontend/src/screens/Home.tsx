@@ -7,7 +7,7 @@ import { when } from "../meta";
 import { useRouter } from "../router";
 import { spacing, useColors } from "../theme";
 import { AppBar, Loading, Page, useFeedback } from "../ui/chrome";
-import { Button, Card, DateField, Dot, Field, Icon, IconButton, Reveal, T, Tappable, web } from "../ui/primitives";
+import { Button, Card, DateField, Dot, Field, Icon, Reveal, T, Tappable, web } from "../ui/primitives";
 
 function NewAssignmentForm() {
   const { navigate } = useRouter();
@@ -125,7 +125,7 @@ export function Home() {
               </View>
             </Tappable>
               </View>
-              <View style={{ paddingRight: spacing.md }}><IconButton icon="close" label={`Delete ${a.name}`} onPress={() => remove(a)} /></View>
+              <View style={{ paddingRight: spacing.md }}><Button small variant="danger" label="Delete" title={`Delete ${a.name} and its submissions`} onPress={() => remove(a)} /></View>
             </View>
           </Reveal>
         ))}

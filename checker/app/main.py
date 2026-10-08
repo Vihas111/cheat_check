@@ -357,8 +357,10 @@ def status(aid: int):
         # changes whenever any score changes, so the page only refreshes when there is something new
         stamp = db.scalar(select(func.count()).select_from(Match).join(Submission, Submission.id == Match.submission_id)
                           .where(Submission.assignment_id == aid))
+    from checker.core import progress
     return JSONResponse({**c, "stamp": f"{c}-{stamp}",
-                         "rescanning": worker is not None and a.name in worker.busy_assignments})
+                         "rescanning": worker is not None and a.name in worker.busy_assignments,
+                         "rescan": progress.snapshot(a.name)})
 
 
 @app.post("/a/{aid}/upload")

@@ -80,5 +80,6 @@ export function useInterval(fn: () => void, ms: number | null) {
   }, [ms]);
 }
 
-export type Status = { queued: number; processing: number; done: number; failed: number; stamp: string; rescanning: boolean };
+export type RescanProgress = { step: number; steps: number; phase: string; done: number; total: number; file: string; eta_s: number | null };
+export type Status = { queued: number; processing: number; done: number; failed: number; stamp: string; rescanning: boolean; rescan?: RescanProgress | null };
 export const isBusy = (s: Status | null) => !!s && (s.queued > 0 || s.processing > 0 || s.rescanning);

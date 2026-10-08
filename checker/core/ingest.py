@@ -269,22 +269,33 @@ def ingest_file(path: Path, assignment: str, *, force=False, seed=False, referen
 def rescan(assignment: str, ocr=None, reprocess_all=False) -> dict:
     """Re-extract stale submissions (old pipeline_version), then re-match and re-score the whole assignment
     in ingestion order, so early submissions get the full context and current rarity weights."""
+    from checker.core import progress
     from checker.core.match import build_index, match_submission
     from checker.core.score import score_many
-    with session_scope() as db:
-        a = get_assignment(db, assignment)
-        subs = db.execute(select(Submission.id, Submission.pipeline_version, Submission.status)
-                          .where(Submission.assignment_id == a.id).order_by(Submission.id)).all()
-    stale = [sid for sid, ver, st in subs if reprocess_all or ver != PIPELINE_VERSION or st == "failed"]
-    for sid in stale:
-        process(sid, ocr)
+    progress.start(assignment)
+    try:
         with session_scope() as db:
-            db.get(Submission, sid).status = "done"
-    with MATCH_LOCK, session_scope() as db:
-        idx = build_index(db, a.id)
-        for sid in sorted(idx.subs):
-            match_submission(db, db.get(Submission, sid), idx, max_other_id=sid)
-        score_many(db, a.id, None, idx)
+            a = get_assignment(db, assignment)
+            subs = db.execute(select(Submission.id, Submission.pipeline_version, Submission.status, Submission.filename)
+                              .where(Submission.assignment_id == a.id).order_by(Submission.id)).all()
+        stale = [(sid, fn) for sid, ver, st, fn in subs if reprocess_all or ver != PIPELINE_VERSION or st == "failed"]
+        for i, (sid, fn) in enumerate(stale):
+            progress.update(assignment, 1, i, len(stale), fn)
+            process(sid, ocr)
+            with session_scope() as db:
+                db.get(Submission, sid).status = "done"
+        with MATCH_LOCK, session_scope() as db:
+            progress.update(assignment, 2, 0, 0)
+            idx = build_index(db, a.id)
+            ids = sorted(idx.subs)
+            names = dict(db.execute(select(Submission.id, Submission.filename).where(Submission.id.in_(ids))).all())
+            for i, sid in enumerate(ids):
+                progress.update(assignment, 2, i, len(ids), names.get(sid, ""))
+                match_submission(db, db.get(Submission, sid), idx, max_other_id=sid)
+            progress.update(assignment, 3, 0, len(ids))
+            score_many(db, a.id, None, idx, on_progress=lambda d, t: progress.update(assignment, 3, d, t))
+    finally:
+        progress.finish(assignment)
     return {"assignment": assignment, "reprocessed": len(stale), "rescored": len(subs)}
 
 

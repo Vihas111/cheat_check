@@ -39,6 +39,8 @@ Useful extras:
 - **Delete one assignment:** the X on the assignment list, or More, "Delete this assignment". It removes that
   assignment's submissions, grades, decisions and stored files, and nothing else. Settings, the roster and other
   assignments stay. "Erase all data" in Settings is the only way to wipe everything.
+- **Re-scan progress:** while a re-scan runs, the dashboard shows the step (re-reading changed files, comparing,
+  scoring), how many submissions are done, the file it is on and a time estimate.
 - **Stopping and restarting:** unfinished files are queued in the database and continue on the next start. Keep using
   the same `data/` folder.
 - **Clusters:** groups of submissions that share distinctive content.
@@ -61,7 +63,8 @@ npm run build        # writes checker/app/static/spa, which the server picks up 
 npm run dev          # development: starts the Python server and Expo with hot reload, open http://localhost:8081
 ```
 
-The built UI is not committed. After pulling changes to `checker/frontend`, run `npm run build` again.
+The built UI is committed in `checker/app/static/spa`, so you do not need Node to run the app. If you change anything in
+`checker/frontend`, run `npm run build` again and commit the result.
 Themes follow the PESUcoin design system (`src/theme`): light, dark, or system, from the icon in the top bar.
 
 ## Using a GPU
