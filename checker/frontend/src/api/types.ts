@@ -28,7 +28,7 @@ export type Submission = {
   id: number; filename: string; page_count: number; status: string; is_seed: boolean; is_reference: boolean; error: string;
   assignment: { id: number; name: string; max_score: number; rubric: Criterion[] };
   student: Student; verify: string | null;
-  nav: { pos: number; count: number; prev: number | null; next: number | null; next_ungraded: number | null; next_flagged: number | null };
+  nav: { pos: number; count: number; prev: number | null; next: number | null; next_ungraded: number | null; next_flagged: number | null; filtered: boolean };
   report: { tier: string | null; reasons: string[]; coverage: number | null; population: number | null; by_source: Source[] };
   flags: { type: string; severity: string; summary: string; help: string; evidence: unknown }[];
   reviews: { status: string; note: string | null; ts: string; suggested: string | null }[];

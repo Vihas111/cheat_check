@@ -72,6 +72,25 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 
+export const FILTER_KEYS = ["grade", "status", "tier", "q"] as const;
+
+/** The dashboard filters carried in the address ("grade=none&status=clear"), so the grader walks only the filtered list. */
+export function useFilterQs(): string {
+  const { route } = useRouter();
+  const q = new URLSearchParams();
+  for (const k of FILTER_KEYS) {
+    const v = route.query.get(k);
+    if (v) q.set(k, v);
+  }
+  return q.toString();
+}
+
+/** A submission address that keeps the filters; extra is e.g. "tab=integrity". */
+export const subPath = (id: number | string, qs: string, extra = "") => {
+  const s = [qs, extra].filter(Boolean).join("&");
+  return `/s/${id}${s ? "?" + s : ""}`;
+};
+
 /** Update only the query string (filters, tabs) without adding a history entry per keystroke. */
 export function useQuery() {
   const { route, navigate } = useRouter();
