@@ -916,6 +916,73 @@ def delete_assignment(aid: int) -> str | None:
     return name
 
 
+def delete_submissions(ids: list[int]) -> dict | None:
+    """Delete individual uploaded files (submissions) with their results, marks and stored files. The rest of
+    the assignment stays and is re-scanned, so other students' matches and weights no longer count them."""
+    import json as _json
+    with session_scope() as db:
+        subs = db.scalars(select(Submission).where(Submission.id.in_(ids))).all()
+        if not subs:
+            return None
+        a = subs[0].assignment
+        name = a.name
+        gone = {x.id for x in subs}
+        shas = {x.sha256 for x in subs}
+        files = {(x.filename, x.sha256) for x in subs}
+        thumbs = set(db.scalars(select(Item.thumb_path).where(Item.submission_id.in_(gone))).all())
+        student_pks = {x.student_pk for x in subs if x.student_pk}
+        for w in db.scalars(select(Whitelist).where(Whitelist.kind == "pair", Whitelist.scope == name)):
+            try:
+                r = _json.loads(w.fingerprint)
+                if r["a"][0] in gone or r["b"][0] in gone:
+                    db.delete(w)  # "not a match" rules about files that no longer exist
+            except (ValueError, KeyError):
+                pass
+        for x in subs:
+            db.delete(x)
+        db.flush()
+        kept_shas = set(db.scalars(select(Submission.sha256).where(Submission.sha256.in_(shas))).all())
+        kept_thumbs = set(db.scalars(select(Item.thumb_path).where(Item.thumb_path.in_(thumbs))).all())
+        for pk in student_pks:
+            st = db.get(Student, pk)
+            if st and not (st.name or st.username or st.email) and not db.scalar(
+                    select(func.count()).select_from(Submission).where(Submission.student_pk == pk)):
+                db.delete(st)
+    root = get_settings().data_dir
+    for sha in shas - kept_shas:
+        (root / "pdfs" / f"{sha}.pdf").unlink(missing_ok=True)
+    for t in thumbs - kept_thumbs:
+        if t:
+            (root / t).unlink(missing_ok=True)
+    import hashlib
+    for fn, sha in files:  # a copy in the inbox folder would be picked up again after a restart
+        f = root / "inbox" / name / fn
+        if f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest() == sha:
+            f.unlink(missing_ok=True)
+    if worker:
+        worker.rescan_async(name)
+    return {"assignment": name, "deleted": len(subs)}
+
+
+def release_drafts(aid: int) -> dict:
+    """Release every draft grade of the assignment. Each one goes through the same checks as releasing by hand:
+    a draft that is incomplete, still being checked, or flagged and waiting for an integrity decision is
+    skipped. Returns {released, held: [{id, filename, reason}]}."""
+    with session_scope() as db:
+        drafts = [(m.submission_id, m.scores_json or {}, m.feedback or "", s.filename)
+                  for m, s in db.execute(select(Mark, Submission).join(Submission, Submission.id == Mark.submission_id)
+                                         .where(Submission.assignment_id == aid, Mark.status == "draft")
+                                         .order_by(Submission.filename)).all()]
+    released, held = 0, []
+    for sid, scores, feedback, filename in drafts:
+        err, state = apply_mark(sid, {k: f"{v:g}" for k, v in scores.items()}, feedback, "release")
+        if err is None and state == "released":
+            released += 1
+        else:
+            held.append({"id": sid, "filename": filename, "reason": err or "Not released."})
+    return {"released": released, "held": held}
+
+
 @app.post("/settings/whitelist/delete")
 def whitelist_delete(kind: str = Form(...), reason: str = Form(""), scope: str = Form("")):
     with session_scope() as db:

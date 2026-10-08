@@ -139,6 +139,27 @@ def delete_assignment(aid: int):
     return {"ok": True}
 
 
+@router.post("/a/{aid}/release-drafts")
+def release_drafts(aid: int):
+    assignment_name(aid)  # 404 if missing
+    return M.release_drafts(aid)
+
+
+class DeleteFiles(BaseModel):
+    ids: list[int]
+
+
+@router.post("/a/{aid}/delete-files")
+def delete_files(aid: int, body: DeleteFiles):
+    assignment_name(aid)
+    with session_scope() as db:  # only files of this assignment
+        ids = [i for i in body.ids if (s := db.get(Submission, i)) and s.assignment_id == aid]
+    r = M.delete_submissions(ids) if ids else None
+    if r is None:
+        raise HTTPException(404, "Those files are already gone.")
+    return {"ok": True, **r}
+
+
 @router.post("/a/{aid}/rescan")
 def rescan(aid: int):
     M.worker.rescan_async(assignment_name(aid))
