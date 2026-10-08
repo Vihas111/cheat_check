@@ -7,7 +7,7 @@ import { when } from "../meta";
 import { useRouter } from "../router";
 import { spacing, useColors } from "../theme";
 import { AppBar, Loading, Page, useFeedback } from "../ui/chrome";
-import { Button, Card, DateField, Dot, Field, Icon, Reveal, T, Tappable, web } from "../ui/primitives";
+import { Button, Card, DateField, Dot, Field, Icon, IconButton, Reveal, T, Tappable, web } from "../ui/primitives";
 
 function NewAssignmentForm() {
   const { navigate } = useRouter();
@@ -57,7 +57,18 @@ export function NewAssignment() {
 export function Home() {
   const c = useColors();
   const { navigate } = useRouter();
+  const { toast, confirm } = useFeedback();
   const { data, error, reload } = useGet<AssignmentCard[]>("/assignments");
+  const remove = async (a: AssignmentCard) => {
+    if (!(await confirm(`Delete ${a.name} and its ${a.total} ${a.total === 1 ? "submission" : "submissions"}, grades and integrity decisions? Other assignments are not touched. This cannot be undone.`, { confirmLabel: `Delete ${a.name}`, danger: true }))) return;
+    try {
+      await api.del(`/a/${a.id}`);
+      toast(`${a.name} deleted.`);
+      reload();
+    } catch (e) {
+      toast((e as Error).message, { tone: "error" });
+    }
+  };
 
   if (!data) return <Page bar={<AppBar title="Grader" />}><Loading error={error} retry={reload} /></Page>;
 
@@ -94,7 +105,9 @@ export function Home() {
       <Card pad={0}>
         {data.map((a, i) => (
           <Reveal key={a.id} delay={i * 40}>
-            <Tappable onPress={() => navigate(`/a/${a.id}`)} label={a.name} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: c.hairline, borderTopLeftRadius: i ? 0 : 15, borderTopRightRadius: i ? 0 : 15, borderBottomLeftRadius: i === data.length - 1 ? 15 : 0, borderBottomRightRadius: i === data.length - 1 ? 15 : 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", borderTopWidth: i ? 1 : 0, borderTopColor: c.hairline }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+            <Tappable href={`/a/${a.id}`} onPress={() => navigate(`/a/${a.id}`)} label={a.name} style={{ borderTopLeftRadius: i ? 0 : 15, borderBottomLeftRadius: i === data.length - 1 ? 15 : 0 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg, minHeight: 68 }}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <T v="title3" numberOfLines={1}>{a.name}</T>
@@ -111,6 +124,9 @@ export function Home() {
                 <Icon name="right" color={c.inkTertiary} />
               </View>
             </Tappable>
+              </View>
+              <View style={{ paddingRight: spacing.md }}><IconButton icon="close" label={`Delete ${a.name}`} onPress={() => remove(a)} /></View>
+            </View>
           </Reveal>
         ))}
       </Card>

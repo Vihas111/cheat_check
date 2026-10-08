@@ -109,7 +109,9 @@ export function SettingsScreen() {
                   <T v="caption" c="inkSecondary" style={{ fontWeight: "400" }}>{f.help}</T>
                 </View>
                 <View style={{ width: 150 }}>
-                  {f.name === "ocr_engine" ? (
+                  {f.name === "ocr_device" ? (
+                    <Select label="ocr_device" value={values[f.name]} onChange={(v) => setValues({ ...values, [f.name]: v })} options={["auto", "cpu", "cuda", "directml"].map((e) => ({ value: e, label: e }))} />
+                  ) : f.name === "ocr_engine" ? (
                     <Select label="ocr_engine" value={values[f.name]} onChange={(v) => setValues({ ...values, [f.name]: v })} options={["auto", "rapidocr", "tesseract"].map((e) => ({ value: e, label: e }))} />
                   ) : (
                     <Field value={values[f.name]} onChangeText={(v) => setValues({ ...values, [f.name]: v })} accessibilityLabel={f.name} keyboardType={f.type === "str" ? "default" : "decimal-pad"} />

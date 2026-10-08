@@ -16,8 +16,9 @@ uv run python -m checker.cli serve        # opens http://127.0.0.1:8000
 ```
 
 1. Create an assignment (optionally with open/deadline dates).
-2. Drag PDFs onto the dashboard. Name them `studentid_anything.pdf` to link them to the roster.
-   You can also copy files into `data/inbox/<assignment name>/`.
+2. Drag PDFs onto the dashboard. You can also copy files into `data/inbox/<assignment name>/`.
+   Students are identified by SRN (`PES1UG25CS138`, `PES1202604133`): first from the filename, then from the
+   cover page text. Without an SRN the filename is used. Change the pattern with the `srn_regex` setting.
 3. Files are processed in the background. The dashboard updates live and ranks submissions HIGH / MEDIUM / LOW.
 4. Open a submission to see where its content came from, the signals with evidence, and side-by-side comparisons.
    Record your review as *reviewed*, *false positive* or *needs follow-up*.
@@ -26,10 +27,20 @@ Useful extras:
 
 - **Boilerplate:** upload the assignment brief or starter code on the dashboard ("Assignment setup").
   Or click "Ignore everywhere" on a matched item. That content is then ignored for everyone.
+- **Ignore only the question:** when a flagged item holds a question and an answer, use "Ignore part of the text"
+  (on the submission's integrity tab, or under the text on a comparison page). Tick the question lines and confirm.
+  Only those lines are ignored, in that assignment. The answer still counts. Undo it under Settings, "Ignored content".
 - **Past cohorts:** upload them as *seed*. Seeds are compared against but never flagged.
 - **Reference sources:** model answers or known online solutions.
 - **Roster** (Settings): a CSV with `student_id,name,username,email`. With a roster, screenshots that show
   another student's name, ID, username or email are flagged.
+- **Dashboard list:** it shows "Showing N of M" while a search or filter is on. Submissions, assignments and
+  comparison buttons are real links, so right-click, middle-click or Ctrl/Cmd-click opens them in a new tab.
+- **Delete one assignment:** the X on the assignment list, or More, "Delete this assignment". It removes that
+  assignment's submissions, grades, decisions and stored files, and nothing else. Settings, the roster and other
+  assignments stay. "Erase all data" in Settings is the only way to wipe everything.
+- **Stopping and restarting:** unfinished files are queued in the database and continue on the next start. Keep using
+  the same `data/` folder.
 - **Clusters:** groups of submissions that share distinctive content.
 - **Calibrate:** score distributions with a suggested cutoff. Change thresholds in Settings, then Re-scan.
 - **Export CSV** and **Print report** (from a submission page).
@@ -50,7 +61,27 @@ npm run build        # writes checker/app/static/spa, which the server picks up 
 npm run dev          # development: starts the Python server and Expo with hot reload, open http://localhost:8081
 ```
 
+The built UI is not committed. After pulling changes to `checker/frontend`, run `npm run build` again.
 Themes follow the PESUcoin design system (`src/theme`): light, dark, or system, from the icon in the top bar.
+
+## Using a GPU
+
+OCR is the slow step and the only one that can use a GPU. Image hashing and screenshot matching run on the CPU.
+The `ocr_device` setting (Settings, or `CHECKER_OCR_DEVICE`) is `auto` by default: it uses a GPU when onnxruntime can see one
+and the CPU otherwise. The server prints `OCR device: ...` at start-up.
+
+The default install ships the CPU build of onnxruntime. Swap it for the build that matches your GPU, then start with
+`--no-sync` so `uv` does not put the CPU build back:
+
+```bash
+# NVIDIA (needs a CUDA 12 + cuDNN 9 install that matches your driver)
+uv pip uninstall onnxruntime && uv pip install onnxruntime-gpu
+# Any GPU on Windows 10/11 (NVIDIA, AMD, Intel)
+uv pip uninstall onnxruntime && uv pip install onnxruntime-directml
+uv run --no-sync python -m checker.cli serve
+```
+
+If the GPU cannot be used, the app logs a warning and falls back to the CPU. Force a choice with `ocr_device` = `cpu`, `cuda` or `directml`.
 
 ## Command line
 
@@ -65,6 +96,7 @@ uv run python -m checker.cli synth tests/synth/out   # synthetic corpus with kno
 
 Data (database, stored images, settings overrides) lives in `data/`. Set `CHECKER_DATA_DIR` to change it.
 Every setting can also be set as an environment variable, such as `CHECKER_OCR_ENGINE=tesseract`.
+It runs fully offline once installed: PDFs, OCR models and results never leave your computer.
 
 ## Tests
 

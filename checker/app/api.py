@@ -94,7 +94,7 @@ def assignment(aid: int, tier: str = "", status: str = "", q: str = "", grade: s
         compared = Counter("seed" if s.is_seed else "reference" for s in db.scalars(
             select(Submission).where(Submission.assignment_id == aid, Submission.is_seed | Submission.is_reference)))
         return {
-            "assignment": assignment_json(a), "rows": [row_json(r) for r in rows],
+            "assignment": assignment_json(a), "rows": [row_json(r) for r in rows], "total": len(everyone),
             "counts": M.job_counts(db, aid), "verify": dict(Counter(r["verify"] for r in everyone)),
             "grades": dict(Counter(r["mark"].status if r["mark"] else "none" for r in everyone if r["gradable"])),
             "failed": [{"filename": f, "error": (e or "unknown error")[:300]} for f, e in failed],
@@ -130,6 +130,13 @@ def assignment_name(aid: int) -> str:
         if not a:
             raise HTTPException(404)
         return a.name
+
+
+@router.delete("/a/{aid}")
+def delete_assignment(aid: int):
+    if M.delete_assignment(aid) is None:
+        raise HTTPException(404)
+    return {"ok": True}
 
 
 @router.post("/a/{aid}/rescan")
@@ -262,6 +269,7 @@ def submission(sid: int):
                      "status": mark.status, "updated_at": iso(mark.updated_at)} if mark else None,
             "items": [{"id": it.id, "page": it.page, "label": M._item_label(it), "weight": weights.get(str(it.id)),
                        "df": dfs.get(str(it.id)), "thumb": img(it.thumb_path), "text": (it.ocr_text or "")[:600],
+                       "lines": M.item_lines(it)[:120],
                        "matched": bool(by_item.get(it.id) and weights.get(str(it.id))),
                        "matches": [{"id": m.id, "filename": others[m.other_submission_id].filename,
                                     "submission_id": m.other_submission_id, "what": match_text(m)}
@@ -311,6 +319,20 @@ def review(sid: int, body: ReviewBody):
     return {"ok": True}
 
 
+class IgnoreText(BaseModel):
+    lines: list[int]
+
+
+@router.post("/item/{iid}/ignore-text")
+def ignore_item_text(iid: int, body: IgnoreText):
+    r = M.ignore_text(iid, body.lines)
+    if r is None:
+        raise HTTPException(404)
+    if r.startswith("!"):
+        raise HTTPException(400, r[1:])
+    return {"ok": True}
+
+
 @router.post("/item/{iid}/ignore")
 def ignore_item(iid: int):
     M.ignore_item(iid, "/")
@@ -334,7 +356,8 @@ def compare(mid: int):
         d = m.detail_json or {}
 
         def panel(it, s, h):
-            return {"submission_id": s.id, "filename": s.filename, "label": M._item_label(it), "thumb": img(it.thumb_path),
+            return {"item_id": it.id, "lines": M.item_lines(it)[:120],
+                    "submission_id": s.id, "filename": s.filename, "label": M._item_label(it), "thumb": img(it.thumb_path),
                     "text_title": "Text read from the image" if it.thumb_path else "Typed text",
                     "chunks": [[c, hit] for c, hit in h] if it.norm_text else []}
 

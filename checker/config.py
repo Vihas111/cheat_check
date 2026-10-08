@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     # OCR: auto | rapidocr | tesseract
     ocr_engine: str = "auto"
+    # OCR hardware: auto | cpu | cuda (NVIDIA) | directml (any GPU on Windows). auto uses a GPU when one is usable.
+    ocr_device: str = "auto"
     ocr_upscale_below: int = 1000
     ocr_dark_mean: int = 110
 

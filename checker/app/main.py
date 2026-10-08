@@ -14,7 +14,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from checker.app.worker import Worker
 from checker.config import PIPELINE_VERSION, get_settings, save_overrides
@@ -24,6 +24,7 @@ from checker.core.db import (
     Assignment,
     Base,
     Flag,
+    Grade,
     Item,
     Job,
     Mark,
@@ -592,6 +593,37 @@ def ignore_item(iid: int, back: str = Form("/")):
     return RedirectResponse(back if back.startswith("/") else "/", 303)
 
 
+def item_lines(it: Item) -> list[str]:
+    """The readable lines of an item's text, in the order the front end shows them (indexes are stable)."""
+    return [ln.strip() for ln in (it.ocr_text or "").splitlines() if ln.strip()]
+
+
+def ignore_text(iid: int, indexes: list[int]) -> str | None:
+    """Ignore only the chosen lines of an item (for example the question, not the answer) in its assignment.
+    Returns the assignment name, or an error message starting with '!'."""
+    from checker.core.ingest import text_fingerprints
+    from checker.core.normalize import normalize_text
+    with session_scope() as db:
+        it = db.get(Item, iid)
+        if not it:
+            return None
+        lines = item_lines(it)
+        chosen = [lines[i] for i in sorted(set(indexes)) if 0 <= i < len(lines)]
+        norm = normalize_text("\n".join(chosen))
+        hashes = set().union(*text_fingerprints(norm).values()) if norm else set()
+        if not hashes:
+            return "!That is too short to recognise. Select at least a few words."
+        snippet = " ".join(chosen)
+        snippet = snippet[:70] + ("…" if len(snippet) > 70 else "")
+        name = it.submission.assignment.name
+        reason = f'ignored text "{snippet}"'
+        for h in hashes:
+            db.add(Whitelist(kind="shingle", fingerprint=str(h), scope=name, reason=reason))
+    if worker:
+        worker.rescan_async(name)
+    return name
+
+
 # ---------------- comparison viewer ----------------
 
 @app.get("/m/{mid}", response_class=HTMLResponse)
@@ -749,6 +781,7 @@ EDITABLE = {
     "filename_regex": "Regex extracting student_id from the PDF filename.",
     "student_id_regex": "Regex for student IDs found inside screenshots.",
     "ocr_engine": "auto, rapidocr or tesseract (all run locally).",
+    "ocr_device": "auto, cpu, cuda or directml. Needs the GPU build of onnxruntime; see the README. Restart to apply.",
     "render_dpi": "Page render resolution for scanned / vector pages.",
     "workers": "Parallel ingestion jobs (restart to apply).",
 }
@@ -811,6 +844,45 @@ def erase_all(confirm: str = Form("")):
     for folder in ("pdfs", "images", "inbox"):
         shutil.rmtree(root / folder, ignore_errors=True)
     return RedirectResponse("/settings?msg=All+data+erased.", 303)
+
+
+def delete_assignment(aid: int) -> str | None:
+    """Delete one assignment with its submissions, grades, decisions and stored files. Other assignments,
+    settings and the roster are kept. Returns the assignment name, or None if it does not exist."""
+    with session_scope() as db:
+        a = db.get(Assignment, aid)
+        if not a:
+            return None
+        name = a.name
+        subs = db.scalars(select(Submission).where(Submission.assignment_id == aid)).all()
+        sub_ids = [x.id for x in subs]
+        shas = {x.sha256 for x in subs}
+        thumbs = set(db.scalars(select(Item.thumb_path).where(Item.submission_id.in_(sub_ids))).all())
+        student_pks = {x.student_pk for x in subs if x.student_pk}
+        for x in subs:  # children go with them (items, shingles, matches, flags, reviews, marks, jobs)
+            db.delete(x)
+        db.flush()
+        db.execute(delete(Grade).where(Grade.assignment_id == aid))
+        db.execute(delete(Whitelist).where(Whitelist.scope == name))
+        db.delete(a)
+        db.flush()
+        # files no remaining submission uses
+        kept_shas = set(db.scalars(select(Submission.sha256).where(Submission.sha256.in_(shas))).all())
+        kept_thumbs = set(db.scalars(select(Item.thumb_path).where(Item.thumb_path.in_(thumbs))).all())
+        # students made only from filenames, now without any submission
+        for pk in student_pks:
+            st = db.get(Student, pk)
+            if st and not (st.name or st.username or st.email) and not db.scalar(
+                    select(func.count()).select_from(Submission).where(Submission.student_pk == pk)):
+                db.delete(st)
+    root = get_settings().data_dir
+    for sha in shas - kept_shas:
+        (root / "pdfs" / f"{sha}.pdf").unlink(missing_ok=True)
+    for t in thumbs - kept_thumbs:
+        if t:
+            (root / t).unlink(missing_ok=True)
+    shutil.rmtree(root / "inbox" / name, ignore_errors=True)  # or the watcher would bring the files back
+    return name
 
 
 @app.post("/settings/whitelist/delete")

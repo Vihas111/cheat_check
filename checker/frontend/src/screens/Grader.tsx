@@ -7,6 +7,7 @@ import { fmt, pct, useMeta, when } from "../meta";
 import { useQuery, useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, useFeedback } from "../ui/chrome";
+import { IgnoreText } from "../ui/IgnoreText";
 import {
   Button, Card, Choices, Disclosure, Dot, Field, Icon, LinkText, Pill, Reveal, Segmented, T, Tappable, Tier, web,
 } from "../ui/primitives";
@@ -243,7 +244,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
             {sub.report.by_source.slice(0, 8).map((b, i) => <View key={b.submission_id} style={{ width: `${b.share * 100}%`, backgroundColor: color(i), borderRightWidth: 2, borderRightColor: c.surface }} />)}
           </View>
           {sub.report.by_source.map((b, i) => (
-            <Tappable key={b.submission_id} onPress={() => navigate(`/s/${b.submission_id}?tab=integrity`)} label={b.filename} style={{ borderRadius: radii.xs }}>
+            <Tappable key={b.submission_id} href={`/s/${b.submission_id}?tab=integrity`} onPress={() => navigate(`/s/${b.submission_id}?tab=integrity`)} label={b.filename} style={{ borderRadius: radii.xs }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 }}>
                 <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color(i) }} />
                 <T v="footnote" c="anchor" style={{ flex: 1 }} numberOfLines={1}>{b.filename}{b.is_reference ? <T v="caption" c="inkTertiary"> known source</T> : null}</T>
@@ -296,6 +297,7 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
                 ))}
                 {it.matches.length > 5 ? <T v="caption" c="inkTertiary">{it.matches.length - 5} more</T> : null}
                 <LinkText v="caption" onPress={() => ignore(it)} style={{ marginTop: 4 }}>Ignore everywhere, it is given material</LinkText>
+                <IgnoreText itemId={it.id} lines={it.lines} assignment={sub.assignment.name} onDone={reload} />
               </View>
             ) : null}
           </View>
