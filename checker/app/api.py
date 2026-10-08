@@ -2,6 +2,7 @@
 verification and export rules stay in one place; the old HTML pages keep working beside it."""
 
 import csv
+import json
 import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -487,10 +488,17 @@ def settings():
         roster = db.scalar(select(func.count()).select_from(Student).where(Student.name.is_not(None)))
         wl = db.execute(select(Whitelist.kind, Whitelist.scope, Whitelist.reason, func.count())
                         .group_by(Whitelist.kind, Whitelist.scope, Whitelist.reason)).all()
+        found = {}
+        for w in db.scalars(select(Whitelist).where(Whitelist.kind.in_(("region", "snippet")))):
+            try:
+                found[(w.kind, w.scope, w.reason)] = json.loads(w.fingerprint).get("found")
+            except ValueError:
+                pass
     return {"fields": [{"name": k, "value": getattr(s, k), "help": h, "type": type(getattr(s, k)).__name__}
                        for k, h in M.EDITABLE.items()],
             "roster": roster, "engines": available_engines(),
-            "ignored": [{"kind": k, "scope": sc, "reason": r, "pieces": n} for k, sc, r, n in wl]}
+            "ignored": [{"kind": k, "scope": sc, "reason": r, "pieces": n, "found": found.get((k, sc, r))}
+                        for k, sc, r, n in wl]}
 
 
 class SettingsBody(BaseModel):

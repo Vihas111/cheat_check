@@ -62,5 +62,5 @@ export type Chart = {
 export type Calibration = { assignment: { id: number; name: string }; n: number; charts: Chart[] };
 export type Settings = {
   fields: { name: string; value: string | number; help: string; type: string }[]; roster: number; engines: string[];
-  ignored: { kind: string; scope: string | null; reason: string | null; pieces: number }[];
+  ignored: { kind: string; scope: string | null; reason: string | null; pieces: number; found?: number | null }[];
 };
