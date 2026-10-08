@@ -60,7 +60,7 @@ app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 # The React front end (checker/frontend, built with `npm run build` into static/spa) takes over the page URLs when
 # it has been built; ?legacy=1 still shows the server-rendered pages, which also remain when it has not.
 SPA = HERE / "static" / "spa"
-PAGE_URL = re.compile(r"^/(?:new|settings|a/\d+(?:/(?:setup|clusters|calibrate))?|s/\d+|m/\d+)?$")
+PAGE_URL = re.compile(r"^/(?:new|settings|a/\d+(?:/(?:setup|clusters|calibrate))?|s/\d+|m/\d+|i/\d+)?$")
 if (SPA / "_expo").is_dir():
     app.mount("/_expo", StaticFiles(directory=SPA / "_expo"), name="spa-assets")
 

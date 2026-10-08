@@ -34,6 +34,9 @@ Useful extras:
 - **Reference sources:** model answers or known online solutions.
 - **Roster** (Settings): a CSV with `student_id,name,username,email`. With a roster, screenshots that show
   another student's name, ID, username or email are flagged.
+- **Everyone who shares an item:** click a screenshot or typed answer on a submission's integrity tab (or "See all
+  matches") to open it in a new tab. The page shows that item next to every other submission that has it, with why each
+  one matches (same picture, cropped copy, shared wording) and a link to compare any pair side by side.
 - **Dashboard list:** it shows "Showing N of M" while a search or filter is on. Submissions, assignments and
   comparison buttons are real links, so right-click, middle-click or Ctrl/Cmd-click opens them in a new tab.
 - **Delete one assignment:** the X on the assignment list, or More, "Delete this assignment". It removes that

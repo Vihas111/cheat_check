@@ -367,6 +367,36 @@ def compare(mid: int):
                 "overlay": f"/m/{m.id}/overlay.png" if a.thumb_path and b.thumb_path else None}
 
 
+@router.get("/i/{iid}")
+def item_page(iid: int):
+    """One item and every other submission that shares it, with the reason for each match."""
+    with session_scope() as db:
+        it = db.get(Item, iid)
+        if not it:
+            raise HTTPException(404)
+        sub = it.submission
+        report = sub.report_json or {}
+        matches = db.scalars(select(Match).where(Match.item_id == iid).order_by(Match.score.desc())).all()
+        out = []
+        for m in matches:
+            o, os_ = db.get(Item, m.other_item_id), db.get(Submission, m.other_submission_id)
+            d = m.detail_json or {}
+            shared = [p["text"][:160] for p in V.text_passages(it.norm_text, o.norm_text)[:3]] if (
+                m.kind == "ocr_text" and it.norm_text and o.norm_text) else []
+            out.append({"match_id": m.id, "submission_id": os_.id, "filename": os_.filename,
+                        "student": student_json(os_.student), "item_id": o.id, "page": o.page,
+                        "label": M._item_label(o), "thumb": img(o.thumb_path), "kind": m.kind,
+                        "what": match_text(m), "why": compare_summary(m.kind, d).replace(" Shared passages are highlighted.", ""), "shared": shared,
+                        "lines": M.item_lines(o)[:6]})
+        return {"item": {"id": it.id, "page": it.page, "label": M._item_label(it), "thumb": img(it.thumb_path),
+                         "lines": M.item_lines(it)[:120], "kinds": sorted({x["kind"] for x in out}),
+                         "weight": (report.get("item_weights") or {}).get(str(iid)),
+                         "df": (report.get("item_df") or {}).get(str(iid))},
+                "submission": {"id": sub.id, "filename": sub.filename, "student": student_json(sub.student)},
+                "assignment": {"id": sub.assignment.id, "name": sub.assignment.name},
+                "matches": out}
+
+
 VARIANT = {"flip_h": "mirrored", "flip_v": "flipped", "rot90": "rotated", "rot180": "rotated", "rot270": "rotated",
            "invert": "colour-inverted"}
 

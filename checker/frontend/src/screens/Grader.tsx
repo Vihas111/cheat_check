@@ -283,10 +283,11 @@ function IntegrityTab({ sub, reload, showPage }: { sub: Submission; reload: () =
               <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>weight {it.weight == null ? "–" : it.weight.toFixed(2)}{it.df && it.df > 1 ? `, in ${it.df} files` : ""}</T>
             </View>
             {it.thumb ? (
-              <a href={it.thumb} target="_blank" rel="noreferrer"><img src={it.thumb} alt={it.label} loading="lazy" style={{ maxWidth: "100%", maxHeight: 160, display: "block", margin: "0 auto", borderRadius: 4 }} /></a>
+              <a href={`/i/${it.id}`} target="_blank" rel="noreferrer" title="Open this item and everyone who shares it in a new tab"><img src={it.thumb} alt={it.label} loading="lazy" style={{ maxWidth: "100%", maxHeight: 160, display: "block", margin: "0 auto", borderRadius: 4, cursor: "zoom-in" }} /></a>
             ) : (
-              <T v="mono" style={{ backgroundColor: c.surfaceAlt, padding: 8, borderRadius: radii.xs, fontSize: 11, maxHeight: 128, overflow: "hidden" } as never}>{it.text}</T>
+              <a href={`/i/${it.id}`} target="_blank" rel="noreferrer" title="Open this item and everyone who shares it in a new tab" style={{ textDecoration: "none", color: "inherit" }}><T v="mono" style={{ backgroundColor: c.surfaceAlt, padding: 8, borderRadius: radii.xs, fontSize: 11, maxHeight: 128, overflow: "hidden" } as never}>{it.text}</T></a>
             )}
+            {it.matches.length ? <a href={`/i/${it.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: c.anchor, textDecoration: "none" }}>See all {it.matches.length} {it.matches.length === 1 ? "match" : "matches"} and why ↗</a> : null}
             {it.matches.length ? (
               <View style={{ gap: 2 }}>
                 {it.matches.slice(0, 5).map((m) => (
