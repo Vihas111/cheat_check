@@ -72,7 +72,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 
-export const FILTER_KEYS = ["grade", "status", "tier", "q"] as const;
+export const FILTER_KEYS = ["grade", "status", "tier", "flagged", "q"] as const;
 
 /** The dashboard filters carried in the address ("grade=none&status=clear"), so the grader walks only the filtered list. */
 export function useFilterQs(): string {

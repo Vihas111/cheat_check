@@ -82,13 +82,13 @@ def create_assignment(body: NewAssignment):
 
 
 @router.get("/a/{aid}")
-def assignment(aid: int, tier: str = "", status: str = "", q: str = "", grade: str = ""):
+def assignment(aid: int, tier: str = "", status: str = "", q: str = "", grade: str = "", flagged: str = ""):
     with session_scope() as db:
         a = db.get(Assignment, aid)
         if not a:
             raise HTTPException(404)
-        rows = M.dashboard_rows(db, aid, tier, status, q, grade)
-        everyone = rows if not (tier or status or q or grade) else M.dashboard_rows(db, aid)
+        rows = M.dashboard_rows(db, aid, tier, status, q, grade, flagged)
+        everyone = rows if not (tier or status or q or grade or flagged) else M.dashboard_rows(db, aid)
         failed = db.execute(select(Submission.filename, Job.error).join(Job, Job.submission_id == Submission.id)
                             .where(Submission.assignment_id == aid, Job.state == "failed")).all()
         compared = Counter("seed" if s.is_seed else "reference" for s in db.scalars(
@@ -219,7 +219,7 @@ def match_text(m: Match) -> str:
 
 
 @router.get("/s/{sid}")
-def submission(sid: int, tier: str = "", status: str = "", q: str = "", grade: str = ""):
+def submission(sid: int, tier: str = "", status: str = "", q: str = "", grade: str = "", flagged: str = ""):
     with session_scope() as db:
         sub = db.get(Submission, sid)
         if not sub:
@@ -244,11 +244,11 @@ def submission(sid: int, tier: str = "", status: str = "", q: str = "", grade: s
         job = db.scalar(select(Job).where(Job.submission_id == sid))
         verify = M.verification(sub, flags, reviews[0] if reviews else None) if sub.status == "done" else None
         # Previous/next follow the list as filtered on the dashboard (same tier, status, search and grade filters).
-        filtered = bool(tier or status or q or grade)
-        queue = [r["sub"].id for r in M.dashboard_rows(db, sub.assignment_id, tier, "awaiting", q, grade)
+        filtered = bool(tier or status or q or grade or flagged)
+        queue = [r["sub"].id for r in M.dashboard_rows(db, sub.assignment_id, tier, "awaiting", q, grade, flagged)
                  if r["sub"].id != sid]
         everyone = [r for r in M.dashboard_rows(db, sub.assignment_id) if r["gradable"]]
-        roster = [r for r in M.dashboard_rows(db, sub.assignment_id, tier, status, q, grade) if r["gradable"]] \
+        roster = [r for r in M.dashboard_rows(db, sub.assignment_id, tier, status, q, grade, flagged) if r["gradable"]] \
             if filtered else everyone
         ids = [r["sub"].id for r in roster]
         marks_by_id = {r["sub"].id: r["mark"] for r in everyone}

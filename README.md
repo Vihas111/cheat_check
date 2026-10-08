@@ -34,10 +34,11 @@ Useful extras:
 - **Reference sources:** model answers or known online solutions.
 - **Roster** (Settings): a CSV with `student_id,name,username,email`. With a roster, screenshots that show
   another student's name, ID, username or email are flagged.
-- **Grade only what you filtered:** pick filters on the dashboard, for example Integrity, "Nothing flagged", and
-  Grade status, "Not graded". Opening a student from that list keeps the filters: Previous, Next, the `[` and `]` keys
-  and "Release and next" only walk the filtered list, and the grader shows "Filtered list, 3 of 12". The breadcrumb
-  returns to the dashboard with the same filters.
+- **Grade only what you filtered:** pick filters on the dashboard. "Flags" (has flags / nothing flagged) is separate
+  from the Integrity state, so they combine, for example Integrity "Decided" with "Nothing flagged". Opening a student
+  from that list keeps the filters: Previous, Next, the `[` and `]` keys and "Release and next" only walk the filtered
+  list. The top right of the grader shows "Filtered, 3 of 72" (or "All submissions, 3 of 181") and a "Clear filter"
+  button that switches to walking every submission. The breadcrumb returns to the dashboard with the same filters.
 - **Everyone who shares an item:** click a screenshot or typed answer on a submission's integrity tab (or "See all
   matches") to open it in a new tab. The page shows that item next to every other submission that has it, with why each
   one matches (same picture, cropped copy, shared wording) and a link to compare any pair side by side.
