@@ -81,7 +81,7 @@ export function SettingsScreen() {
             {data.ignored.length ? data.ignored.map((w, i) => (
               <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, borderTopWidth: 1, borderTopColor: c.hairline, paddingTop: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <T v="footnote" style={{ fontWeight: "600" }}>{w.kind === "image" ? "images" : w.kind === "region" ? "image part" : "text"} · {w.scope || "all assignments"} · {w.pieces} pieces</T>
+                  <T v="footnote" style={{ fontWeight: "600" }}>{w.kind === "image" ? "images" : w.kind === "region" ? "image part" : w.kind === "pair" ? "not a match" : "text"} · {w.scope || "all assignments"} · {w.pieces} pieces</T>
                   <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>{w.reason}</T>
                 </View>
                 <Button small label="Stop ignoring" onPress={() => attempt("wl" + i, async () => {

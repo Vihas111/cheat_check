@@ -6,8 +6,9 @@ import { useRouter } from "../router";
 import { radii, spacing, useColors } from "../theme";
 import { AppBar, Loading, Page } from "../ui/chrome";
 import { IgnoreRegion, MaskedThumb } from "../ui/IgnoreRegion";
+import { useDismiss } from "../ui/useDismiss";
 import { IgnoreText } from "../ui/IgnoreText";
-import { Card, Disclosure, LinkText, Reveal, T, Tappable } from "../ui/primitives";
+import { Button, Card, Disclosure, LinkText, Reveal, T, Tappable } from "../ui/primitives";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -38,6 +39,7 @@ export function CompareScreen({ mid }: { mid: string }) {
   const { navigate } = useRouter();
   const { width } = useWindowDimensions();
   const { data, error, reload } = useGet<Compare>(`/m/${mid}`);
+  const dismiss = useDismiss();
 
   if (!data) return <Page bar={<AppBar title="Compare" crumbs={[{ label: "Assignments", to: "/" }]} />}><Loading error={error} retry={reload} /></Page>;
 
@@ -52,6 +54,10 @@ export function CompareScreen({ mid }: { mid: string }) {
     <Page bar={bar}>
       <Reveal style={{ gap: spacing.sm }}>
         <T>{data.summary}</T>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm }}>
+          <Button variant="danger" label="Not a match" title="These two are not really the same. Stop counting this pair." onPress={() => dismiss(data.id, () => navigate(`/s/${data.a.submission_id}?tab=integrity`))} />
+          <T v="caption" c="inkTertiary" style={{ fontWeight: "400" }}>Stops counting this pair everywhere. You can undo it right after, or later in Settings.</T>
+        </View>
         <T v="footnote" c="inkSecondary">Look for an innocent explanation too: given material, a shared data set, or a result every correct answer produces.</T>
       </Reveal>
 

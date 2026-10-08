@@ -598,6 +598,31 @@ def ignore_item(iid: int, back: str = Form("/")):
     return RedirectResponse(back if back.startswith("/") else "/", 303)
 
 
+def dismiss_match(mid: int) -> dict | None:
+    """Mark the two items of this match as "not a match": the pair stops counting for every kind of match, in
+    both directions, now and on every later scan. Returns what is needed to undo it."""
+    import json as _json
+    with session_scope() as db:
+        m = db.get(Match, mid)
+        if not m:
+            return None
+        a, b = db.get(Item, m.item_id), db.get(Item, m.other_item_id)
+        sa, sb = db.get(Submission, a.submission_id), db.get(Submission, b.submission_id)
+        name = sa.assignment.name
+        ka, kb = [a.submission_id, a.page, a.idx], [b.submission_id, b.page, b.idx]
+        reason = f"not a match: {sa.filename} {_item_label(a)} and {sb.filename} {_item_label(b)}"
+        if not db.scalar(select(Whitelist.id).where(Whitelist.kind == "pair", Whitelist.scope == name,
+                                                    Whitelist.reason == reason)):
+            db.add(Whitelist(kind="pair", fingerprint=_json.dumps({"a": ka, "b": kb}), scope=name, reason=reason))
+        db.execute(delete(Match).where(
+            ((Match.item_id == a.id) & (Match.other_item_id == b.id))
+            | ((Match.item_id == b.id) & (Match.other_item_id == a.id))))
+        out = {"scope": name, "reason": reason, "submission_id": sa.id}
+    if worker:
+        worker.rescan_async(name)
+    return out
+
+
 def item_lines(it: Item) -> list[str]:
     """The readable lines of an item's text, in the order the front end shows them (indexes are stable)."""
     return [ln.strip() for ln in (it.ocr_text or "").splitlines() if ln.strip()]

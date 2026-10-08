@@ -372,6 +372,14 @@ def ignore_item(iid: int):
     return {"ok": True}
 
 
+@router.post("/m/{mid}/dismiss")
+def dismiss(mid: int):
+    r = M.dismiss_match(mid)
+    if r is None:
+        raise HTTPException(404, "That match is already gone.")
+    return {"ok": True, **r}
+
+
 @router.get("/m/{mid}")
 def compare(mid: int):
     with session_scope() as db:

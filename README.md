@@ -27,6 +27,11 @@ Useful extras:
 
 - **Boilerplate:** upload the assignment brief or starter code on the dashboard ("Assignment setup").
   Or click "Ignore everywhere" on a matched item. That content is then ignored for everyone.
+- **Not a match:** when two items are flagged as the same but are not, click **Not a match**. It is on the comparison
+  page, on each match in a submission's integrity tab and on each card of the "See all matches" page. That pair of
+  items stops counting right away, for every kind of match and in both directions, and the assignment is re-scanned
+  so coverage, flags and tiers update. The toast has an Undo, and the rule stays under Settings, "Ignored content"
+  ("not a match") until you remove it. Other pairs involving the same items are not affected.
 - **Ignore part of an image:** on an image item (the item page, the integrity tab or a comparison page) use "Ignore part
   of the image…" and drag a box over the part, for example a question header or a tool bar, then confirm. The app finds
   that same part in every image of the assignment, even at another size, blanks it out before images are compared and

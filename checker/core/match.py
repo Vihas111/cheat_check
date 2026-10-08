@@ -4,6 +4,7 @@
 the same image or text (uncapped; also used for rarity weights). `match_submission()` caps it to the
 top candidates, verifies, and stores symmetric Match rows."""
 
+import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -35,6 +36,12 @@ class Index:
     wl_images: np.ndarray  # (m, w) uint64 whitelisted pHashes
     wl_shingles: set
     sha_subs: dict  # pixel sha256 -> {sub_id} (pixel-identical images)
+    dismissed: frozenset = frozenset()  # {frozenset({(sub, page, idx), (sub, page, idx)})}: pairs marked "not a match"
+    item_key: dict | None = None  # item_id -> (sub, page, idx), stable across re-extraction
+
+
+def pair_key(a: tuple, b: tuple) -> frozenset:
+    return frozenset((tuple(a), tuple(b)))
 
 
 def build_index(db, assignment_id: int) -> Index:
@@ -54,11 +61,22 @@ def build_index(db, assignment_id: int) -> Index:
     aname = db.get(Assignment, assignment_id).name
     wl = db.scalars(select(Whitelist).where(or_(Whitelist.scope.is_(None), Whitelist.scope == aname))).all()
     wl_img = [fp.to_u64(bytes.fromhex(w.fingerprint)) for w in wl if w.kind == "image"]
+    dismissed = set()
+    for w in wl:
+        if w.kind == "pair":
+            try:
+                r = json.loads(w.fingerprint)
+                dismissed.add(pair_key(r["a"], r["b"]))
+            except (ValueError, KeyError):
+                log.warning("unreadable 'not a match' rule: %s", w.reason)
+    item_key = {i: (sid, pg, ix) for i, sid, pg, ix in db.execute(
+        select(Item.id, Item.submission_id, Item.page, Item.idx).where(Item.submission_id.in_(subs)))} if subs else {}
     return Index(assignment_id, subs, np.array([r.id for r in rows], dtype=np.int64),
                  np.array([r.submission_id for r in rows], dtype=np.int64), hashes,
                  {r.id: r.sha256 for r in rows},
                  np.stack(wl_img) if wl_img else np.zeros((0, words), np.uint64),
-                 {int(w.fingerprint) for w in wl if w.kind == "shingle"}, sha_subs)
+                 {int(w.fingerprint) for w in wl if w.kind == "shingle"}, sha_subs,
+                 frozenset(dismissed), item_key)
 
 
 def _whitelisted_image(item: Item, idx: Index) -> bool:
@@ -158,6 +176,10 @@ def overlaps(db, sub: Submission, idx: Index) -> dict:
                 or not (it.id in wordy and h["other_item"] in wordy)]
         hits += [dict(h, kind="code_structure" if h["group"] == "code" else "ocr_text") for h in text.get(it.id, [])]
         hits = [h for h in hits if not (sub.student_pk and idx.subs[h["other_sub"]]["student_pk"] == sub.student_pk)]
+        if idx.dismissed and idx.item_key and it.id in idx.item_key:  # the marker said these two are not a match
+            mine = idx.item_key[it.id]
+            hits = [h for h in hits if pair_key(mine, idx.item_key.get(h["other_item"], (0, 0, 0)))
+                    not in idx.dismissed]
         out[it.id] = {"item": it, "whitelisted": wl, "hits": hits}
     return out
 
