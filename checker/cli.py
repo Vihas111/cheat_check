@@ -33,10 +33,13 @@ def cmd_serve(args):
     url = f"http://{s.host}:{args.port or s.port}"
     print(f"Similarity checker running at {url}  (Ctrl+C to stop)")
     try:
-        from checker.core.ocr import pick_device
-        print(f"OCR device: {pick_device()}  (change with the ocr_device setting)")
-    except ImportError:
-        pass
+        from checker.core.ocr import get_engine
+        eng = get_engine()
+        dev = getattr(eng, "device", "cpu")
+        print(f"OCR: {eng.name} on {'GPU (' + dev + ')' if dev != 'cpu' else 'CPU'}"
+              + ("" if dev != "cpu" else "  (no usable GPU found; see README, Using a GPU)"))
+    except Exception as e:
+        print(f"OCR engine not ready: {e}")
     if not args.no_browser:
         webbrowser.open(url)
     uvicorn.run("checker.app.main:app", host=s.host, port=args.port or s.port, log_level="warning")
