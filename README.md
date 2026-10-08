@@ -67,21 +67,24 @@ Themes follow the PESUcoin design system (`src/theme`): light, dark, or system, 
 ## Using a GPU
 
 OCR is the slow step and the only one that can use a GPU. Image hashing and screenshot matching run on the CPU.
-The `ocr_device` setting (Settings, or `CHECKER_OCR_DEVICE`) is `auto` by default: it uses a GPU when onnxruntime can see one
-and the CPU otherwise. The server prints `OCR device: ...` at start-up.
 
-The default install ships the CPU build of onnxruntime. Swap it for the build that matches your GPU, then start with
-`--no-sync` so `uv` does not put the CPU build back:
+The default install already includes the GPU build of onnxruntime, so the normal command uses the GPU when it can:
 
 ```bash
-# NVIDIA (needs a CUDA 12 + cuDNN 9 install that matches your driver)
-uv pip uninstall onnxruntime && uv pip install onnxruntime-gpu
-# Any GPU on Windows 10/11 (NVIDIA, AMD, Intel)
-uv pip uninstall onnxruntime && uv pip install onnxruntime-directml
-uv run --no-sync python -m checker.cli serve
+uv sync
+uv run python -m checker.cli serve
 ```
 
-If the GPU cannot be used, the app logs a warning and falls back to the CPU. Force a choice with `ocr_device` = `cpu`, `cuda` or `directml`.
+- **Windows:** DirectML, which works with NVIDIA, AMD and Intel GPUs. You only need up-to-date graphics drivers.
+- **Linux with an NVIDIA GPU:** CUDA. The CUDA libraries come through pip. You only need the NVIDIA driver.
+- **macOS:** CPU.
+
+At start-up the server prints `OCR: rapidocr on GPU (directml)` or `... on CPU`. If the GPU cannot be used (no GPU,
+old driver, a library problem), the app logs why and falls back to the CPU on its own.
+
+Settings (restart to apply): `ocr_device` is `auto` (default), `cpu`, `cuda` or `directml`. `ocr_gpu_id` picks the GPU
+when there is more than one, for example a laptop with a built-in and a dedicated GPU: try `1` if it is using the
+wrong one. Environment variables work too, such as `CHECKER_OCR_DEVICE=cpu`.
 
 ## Command line
 

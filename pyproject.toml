@@ -10,6 +10,10 @@ dependencies = [
     "opencv-python-headless",
     "imagehash",
     "rapidocr-onnxruntime",
+    # GPU builds of onnxruntime by platform, so `uv run` uses the GPU by default (falls back to the CPU at run time).
+    # DirectML covers NVIDIA, AMD and Intel GPUs on Windows; CUDA covers NVIDIA on Linux. macOS keeps the CPU build.
+    "onnxruntime-directml; sys_platform == 'win32'",
+    "onnxruntime-gpu[cuda,cudnn]; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "pytesseract",
     "scikit-learn",
     "rapidfuzz",
@@ -25,6 +29,10 @@ dependencies = [
     "watchdog",
     "networkx",
 ]
+
+[tool.uv]
+# rapidocr asks for plain `onnxruntime`, which would clash with the GPU builds above (same Python module).
+override-dependencies = ["onnxruntime; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine != 'x86_64')"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "httpx"]

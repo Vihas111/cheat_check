@@ -72,17 +72,55 @@ def pick_device(requested: str | None = None) -> str:
     return "cpu"
 
 
+GPU_PROVIDERS = {"cuda": "CUDAExecutionProvider", "directml": "DmlExecutionProvider"}
+
+
+def _use_gpu_id(gpu_id: int) -> None:
+    """RapidOCR always asks for GPU 0; pass the configured GPU id through instead."""
+    from rapidocr_onnxruntime.utils.infer_engine import OrtInferSession
+    if getattr(OrtInferSession, "_gpu_id_patched", None) == gpu_id:
+        return
+    original = getattr(OrtInferSession, "_orig_get_ep_list", OrtInferSession._get_ep_list)
+
+    def patched(self):
+        eps = original(self)
+        return [(n, {**o, "device_id": gpu_id}) if n != "CPUExecutionProvider" and "device_id" in o else (n, o)
+                for n, o in eps]
+
+    OrtInferSession._orig_get_ep_list = original
+    OrtInferSession._get_ep_list = patched
+    OrtInferSession._gpu_id_patched = gpu_id
+
+
 class RapidOcrEngine:
     name = "rapidocr"
 
     def __init__(self):
         from rapidocr_onnxruntime import RapidOCR
-        self.device = pick_device()
-        flags = {f"{m}_use_{'cuda' if self.device == 'cuda' else 'dml'}": True
-                 for m in ("det", "cls", "rec")} if self.device != "cpu" else {}
-        self._ocr = RapidOCR(**flags)
-        log.info("OCR running on %s", self.device)
+        self.device = "cpu"
         self._lock = threading.Lock()  # ponytail: one OCR at a time per process; onnxruntime is multi-threaded inside
+        want = pick_device()
+        if want == "cuda":
+            try:
+                import onnxruntime
+                onnxruntime.preload_dlls()  # finds the CUDA libraries installed through pip (nvidia-* packages)
+            except Exception:
+                pass
+        if want != "cpu":
+            try:
+                _use_gpu_id(get_settings().ocr_gpu_id)
+                flags = {f"{m}_use_{'cuda' if want == 'cuda' else 'dml'}": True for m in ("det", "cls", "rec")}
+                eng = RapidOCR(**flags)
+                active = eng.text_det.infer.session.get_providers()[0]
+                if active != GPU_PROVIDERS[want]:
+                    raise RuntimeError(f"onnxruntime fell back to {active}")
+                eng(np.full((64, 256, 3), 255, dtype=np.uint8))  # a first run shows driver or library problems now
+                self._ocr, self.device = eng, want
+            except Exception as e:
+                log.warning("The GPU (%s) could not be used (%s). Using the CPU instead.", want, str(e)[:200])
+        if self.device == "cpu":
+            self._ocr = RapidOCR()
+        log.info("OCR running on %s", self.device)
 
     def extract(self, image: Image.Image) -> dict:
         g, scale = preprocess(image)

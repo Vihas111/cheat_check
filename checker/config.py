@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     ocr_engine: str = "auto"
     # OCR hardware: auto | cpu | cuda (NVIDIA) | directml (any GPU on Windows). auto uses a GPU when one is usable.
     ocr_device: str = "auto"
+    ocr_gpu_id: int = 0  # which GPU to use when there are several (0 is the first one Windows or CUDA lists)
     ocr_upscale_below: int = 1000
     ocr_dark_mean: int = 110
 
