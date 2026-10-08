@@ -32,6 +32,20 @@ Useful extras:
   items stops counting right away, for every kind of match and in both directions, and the assignment is re-scanned
   so coverage, flags and tiers update. The toast has an Undo, and the rule stays under Settings, "Ignored content"
   ("not a match") until you remove it. Other pairs involving the same items are not affected.
+- **Ignore part of an image or text, in every PDF:** select the lines ("Ignore part of the text…") or drag a box
+  ("Ignore part of the image…") once, in one PDF. The re-scan then looks for that same passage in every other PDF of the
+  assignment. Text is found by fuzzy matching against each PDF's own OCR text, so a different font size, theme, line
+  wrapping or a few OCR mistakes do not hide it. A boxed part that has no text (an icon, a tool bar) is also searched
+  for by its pixels at several scales. Wherever it is found, that text stops counting and that area is blanked before
+  images are compared, so two other PDFs that only share the ignored passage no longer match each other. Found areas
+  show as grey dashed boxes. Settings, "Ignored content" says how many places each rule was applied in, and "Stop
+  ignoring" removes it and re-scans. "Ignore everywhere" on a whole item works the same way: its copies in other
+  PDFs, even resized or cropped ones, are ignored, while unrelated content on the same page is still checked.
+- **Not a match:** when two items are flagged as the same but are not, click **Not a match**. It is on the comparison
+  page, on each match in a submission's integrity tab and on each card of the "See all matches" page. That pair of
+  items stops counting right away, for every kind of match and in both directions, and the assignment is re-scanned
+  so coverage, flags and tiers update. The toast has an Undo, and the rule stays under Settings, "Ignored content"
+  ("not a match") until you remove it. Other pairs involving the same items are not affected.
 - **Ignore part of an image:** on an image item (the item page, the integrity tab or a comparison page) use "Ignore part
   of the image…" and drag a box over the part, for example a question header or a tool bar, then confirm. The app finds
   that same part in every image of the assignment, even at another size, blanks it out before images are compared and

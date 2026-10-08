@@ -33,8 +33,8 @@ def preprocess(im: Image.Image) -> tuple[Image.Image, float]:
     return g, scale
 
 
-def lines_to_text(words: list[dict]) -> str:
-    """Group boxes into reading-order lines by vertical overlap."""
+def group_lines(words: list[dict]) -> list[list[dict]]:
+    """Group boxes into reading-order lines by vertical overlap; each line is sorted left to right."""
     words = sorted(words, key=lambda w: (w["bbox"][1] + w["bbox"][3]) / 2)
     lines: list[list[dict]] = []
     for w in words:
@@ -47,7 +47,11 @@ def lines_to_text(words: list[dict]) -> str:
                 lines[-1].append(w)
                 continue
         lines.append([w])
-    return "\n".join(" ".join(w["text"] for w in sorted(ln, key=lambda w: w["bbox"][0])) for ln in lines)
+    return [sorted(ln, key=lambda w: w["bbox"][0]) for ln in lines]
+
+
+def lines_to_text(words: list[dict]) -> str:
+    return "\n".join(" ".join(w["text"] for w in ln) for ln in group_lines(words))
 
 
 def _result(words: list[dict]) -> dict:
